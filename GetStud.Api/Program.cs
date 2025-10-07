@@ -11,7 +11,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.Map("/api", () => "health" );
+app.Map("/api ", () => "health" );
 app.UseAuthorization();
 
 app.MapControllers();
