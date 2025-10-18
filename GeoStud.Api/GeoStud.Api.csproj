@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>GeoStud.Api</AssemblyName>
+    <OutputType>Exe</OutputType>
+  <IsAspireService>true</IsAspireService>
   </PropertyGroup>
 
   <ItemGroup>
