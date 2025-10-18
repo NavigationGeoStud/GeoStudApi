@@ -4,7 +4,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>GetStud.Api</AssemblyName>
+    <AssemblyName>GeoStud.Api</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
