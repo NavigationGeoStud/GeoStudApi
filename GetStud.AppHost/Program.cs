@@ -6,10 +6,28 @@ var api = builder.AddProject<Projects.GetStud_Api>("getstud-api")
     .WithHttpsEndpoint(port: 7281, name: "https")
     .WithHttpEndpoint(port: 5032, name: "http");
 
-// Add health checks
+// Add health check
 api.WithHealthCheck("/health");
 
-// Add metrics endpoint
-api.WithEnvironment("ASPNETCORE_URLS", "https://+:7281;http://+:5032");
+// Add monitoring and observability
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing =>
+    {
+        tracing.AddAspNetCoreInstrumentation()
+               .AddHttpClientInstrumentation();
+    })
+    .WithMetrics(metrics =>
+    {
+        metrics.AddAspNetCoreInstrumentation()
+               .AddHttpClientInstrumentation()
+               .AddRuntimeInstrumentation();
+    });
+
+// Add logging
+builder.Services.AddLogging(logging =>
+{
+    logging.AddConsole();
+    logging.AddDebug();
+});
 
 builder.Build().Run();
