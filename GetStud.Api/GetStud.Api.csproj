@@ -4,13 +4,16 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>GetStud.Api</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
 	  <FrameworkReference Include="Microsoft.AspNetCore.App" />
 	  <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.9" />
-	  <PackageReference Include="Aspire.Hosting.OpenTelemetry" Version="9.0.0" />
-	  <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.7.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ServiceDefaults\ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>
