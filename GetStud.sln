@@ -5,8 +5,6 @@ VisualStudioVersion = 17.14.36511.14
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GetStud.Api", "GetStud.Api\GetStud.Api.csproj", "{7F4A2B9C-CF97-A207-3770-EBDEAAC0BDC9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GetStud.AppHost", "GetStud.AppHost\GetStud.AppHost.csproj", "{D195EC41-0B58-9379-A1BC-B0C9C0F6E3B5}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServiceDefaults", "ServiceDefaults\ServiceDefaults.csproj", "{0F759BEF-050E-408A-972B-13637D857C98}"
 EndProject
 Global
@@ -31,14 +29,6 @@ Global
 		{7F4A2B9C-CF97-A207-3770-EBDEAAC0BDC9}.Release|x64.Build.0 = Release|Any CPU
 		{7F4A2B9C-CF97-A207-3770-EBDEAAC0BDC9}.Release|x86.ActiveCfg = Release|Any CPU
 		{7F4A2B9C-CF97-A207-3770-EBDEAAC0BDC9}.Release|x86.Build.0 = Release|Any CPU
-		{D195EC41-0B58-9379-A1BC-B0C9C0F6E3B5}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{D195EC41-0B58-9379-A1BC-B0C9C0F6E3B5}.Debug|x64.Build.0 = Debug|Any CPU
-		{D195EC41-0B58-9379-A1BC-B0C9C0F6E3B5}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{D195EC41-0B58-9379-A1BC-B0C9C0F6E3B5}.Debug|x86.Build.0 = Debug|Any CPU
-		{D195EC41-0B58-9379-A1BC-B0C9C0F6E3B5}.Release|x64.ActiveCfg = Release|Any CPU
-		{D195EC41-0B58-9379-A1BC-B0C9C0F6E3B5}.Release|x64.Build.0 = Release|Any CPU
-		{D195EC41-0B58-9379-A1BC-B0C9C0F6E3B5}.Release|x86.ActiveCfg = Release|Any CPU
-		{D195EC41-0B58-9379-A1BC-B0C9C0F6E3B5}.Release|x86.Build.0 = Release|Any CPU
 		{0F759BEF-050E-408A-972B-13637D857C98}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{0F759BEF-050E-408A-972B-13637D857C98}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0F759BEF-050E-408A-972B-13637D857C98}.Debug|x64.ActiveCfg = Debug|Any CPU
