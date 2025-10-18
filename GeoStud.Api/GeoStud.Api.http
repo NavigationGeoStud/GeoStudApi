@@ -1,6 +1,0 @@
-@GetStud.Api_HostAddress = http://localhost:5032
-
-GET {{GetStud.Api_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###

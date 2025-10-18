@@ -4,17 +4,6 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>GeoStud.Api</AssemblyName>
-    <OutputType>Exe</OutputType>
-    <IsAspireService>true</IsAspireService>
   </PropertyGroup>
-
-  <ItemGroup>
-	  <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.10" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\ServiceDefaults\ServiceDefaults.csproj" />
-  </ItemGroup>
 
 </Project>
