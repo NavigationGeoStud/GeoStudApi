@@ -41,15 +41,15 @@ public class SurveyController : ControllerBase
                 return BadRequest(ModelState);
             }
 
-            // Get current user ID from token
-            var userIdClaim = User.FindFirst("user_id")?.Value;
-            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+            // Get service client ID from token
+            var clientIdClaim = User.FindFirst("client_id")?.Value;
+            if (string.IsNullOrEmpty(clientIdClaim))
             {
-                return Unauthorized("Invalid user token");
+                return Unauthorized("Invalid service token");
             }
 
             // Check if student already exists
-            var username = User.Identity?.Name ?? "anonymous";
+            var username = $"service_{clientIdClaim}";
             var existingStudent = await _context.Students
                 .FirstOrDefaultAsync(s => s.Username == username);
 
@@ -74,9 +74,9 @@ public class SurveyController : ControllerBase
                 // Create new student
                 student = new Student
                 {
-                    Username = User.Identity?.Name ?? "anonymous",
-                    Email = User.FindFirst("email")?.Value ?? "unknown@example.com",
-                    PasswordHash = "survey_user", // Not used for survey users
+                    Username = username,
+                    Email = $"{clientIdClaim}@service.local",
+                    PasswordHash = "service_user", // Not used for service users
                     AgeRange = request.AgeRange,
                     IsStudent = request.IsStudent,
                     Gender = request.Gender,

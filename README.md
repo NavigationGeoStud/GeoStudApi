@@ -34,23 +34,20 @@ dotnet run --project GeoStud.Api.csproj --environment Production
 - **API**: `https://localhost:5001/api/v1/`
 - **Health Check**: `https://localhost:5001/api/v1/health`
 
-### 🔐 Тестовые данные
+### 🔐 Сервисные клиенты
 
-**Пользователь:**
-- Username: `admin`
-- Password: `Admin123!`
-
-**Сервисные клиенты:**
+**Доступные сервисные клиенты:**
 - Client ID: `mobile-app`, Secret: `MobileAppSecret123!`
 - Client ID: `web-app`, Secret: `WebAppSecret123!`
+- Client ID: `analytics-service`, Secret: `AnalyticsServiceSecret123!`
 
 ### 📝 Примеры запросов
 
-**1. Аутентификация:**
+**1. Аутентификация сервиса:**
 ```bash
-curl -X POST https://localhost:5001/api/v1/auth/login \
+curl -X POST https://localhost:5001/api/v1/auth/service-login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"Admin123!"}'
+  -d '{"clientId":"mobile-app","clientSecret":"MobileAppSecret123!"}'
 ```
 
 **2. Отправка опроса:**
@@ -79,8 +76,7 @@ curl -X GET https://localhost:5001/api/v1/analytics/comprehensive \
 ## 📋 Основные API Endpoints
 
 ### Аутентификация
-- `POST /api/v1/auth/login` - Вход пользователя
-- `POST /api/v1/auth/service-login` - Вход сервиса
+- `POST /api/v1/auth/service-login` - Аутентификация сервиса
 
 ### Опросы студентов
 - `POST /api/v1/survey/submit` - Отправить данные опроса

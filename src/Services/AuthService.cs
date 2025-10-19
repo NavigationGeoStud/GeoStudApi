@@ -23,38 +23,6 @@ public class AuthService : IAuthService
         _logger = logger;
     }
 
-    public async Task<AuthResponse?> AuthenticateUserAsync(LoginRequest request)
-    {
-        try
-        {
-            var user = await _context.Users
-                .Include(u => u.UserRoles)
-                .ThenInclude(ur => ur.Role)
-                .FirstOrDefaultAsync(u => u.Username == request.Username && u.IsActive && !u.IsDeleted);
-
-            if (user == null || !VerifyPassword(request.Password, user.PasswordHash))
-            {
-                return null;
-            }
-
-            // Update last login
-            user.LastLoginAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-
-            var token = GenerateJwtToken(user);
-            return new AuthResponse
-            {
-                AccessToken = token,
-                ExpiresIn = GetTokenExpirationMinutes(),
-                ExpiresAt = DateTime.UtcNow.AddMinutes(GetTokenExpirationMinutes())
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error authenticating user: {Username}", request.Username);
-            return null;
-        }
-    }
 
     public async Task<AuthResponse?> AuthenticateServiceAsync(ServiceAuthRequest request)
     {
@@ -114,19 +82,6 @@ public class AuthService : IAuthService
         }
     }
 
-    public Task<string?> GetUserIdFromTokenAsync(string token)
-    {
-        try
-        {
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var jwtToken = tokenHandler.ReadJwtToken(token);
-            return Task.FromResult(jwtToken.Claims.FirstOrDefault(x => x.Type == "user_id")?.Value);
-        }
-        catch
-        {
-            return Task.FromResult<string?>(null);
-        }
-    }
 
     public Task<string?> GetServiceClientIdFromTokenAsync(string token)
     {
@@ -142,28 +97,6 @@ public class AuthService : IAuthService
         }
     }
 
-    private string GenerateJwtToken(User user)
-    {
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var key = Encoding.ASCII.GetBytes(GetJwtSecret());
-        var tokenDescriptor = new SecurityTokenDescriptor
-        {
-            Subject = new ClaimsIdentity(new[]
-            {
-                new Claim("user_id", user.Id.ToString()),
-                new Claim("username", user.Username),
-                new Claim("email", user.Email),
-                new Claim("type", "user")
-            }),
-            Expires = DateTime.UtcNow.AddMinutes(GetTokenExpirationMinutes()),
-            Issuer = GetJwtIssuer(),
-            Audience = GetJwtAudience(),
-            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
-        };
-
-        var token = tokenHandler.CreateToken(tokenDescriptor);
-        return tokenHandler.WriteToken(token);
-    }
 
     private string GenerateServiceJwtToken(ServiceClient serviceClient)
     {
