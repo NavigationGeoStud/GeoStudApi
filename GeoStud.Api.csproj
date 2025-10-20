@@ -8,6 +8,11 @@
 
   <ItemGroup>
     <Compile Remove="src/ProgramLocal.cs" />
+    <Compile Remove="GetStud.Api.Tests/**" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <None Remove="GetStud.Api.Tests/**" />
   </ItemGroup>
 
   <ItemGroup>
