@@ -5,18 +5,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{7F4A2B9C-CF97-A207-3770-EBDEAAC0BDC9}|GetStud.Api\\GetStud.Api.csproj|c:\\users\\vladi\\source\\repos\\getstud\\getstud.api\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{7F4A2B9C-CF97-A207-3770-EBDEAAC0BDC9}|GetStud.Api\\GetStud.Api.csproj|solutionrelative:getstud.api\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{7F4A2B9C-CF97-A207-3770-EBDEAAC0BDC9}|GetStud.Api\\GetStud.Api.csproj|c:\\users\\vladi\\source\\repos\\getstud\\getstud.api\\getstud.api.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
-      "RelativeMoniker": "D:0:0:{7F4A2B9C-CF97-A207-3770-EBDEAAC0BDC9}|GetStud.Api\\GetStud.Api.csproj|solutionrelative:getstud.api\\getstud.api.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{7F4A2B9C-CF97-A207-3770-EBDEAAC0BDC9}|GetStud.Api\\GetStud.Api.csproj|c:\\users\\vladi\\source\\repos\\getstud\\getstud.api\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
-      "RelativeMoniker": "D:0:0:{7F4A2B9C-CF97-A207-3770-EBDEAAC0BDC9}|GetStud.Api\\GetStud.Api.csproj|solutionrelative:getstud.api\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{7F4A2B9C-CF97-A207-3770-EBDEAAC0BDC9}|GetStud.Api\\GetStud.Api.csproj|c:\\users\\vladi\\source\\repos\\getstud\\getstud.api\\weatherforecast.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{7F4A2B9C-CF97-A207-3770-EBDEAAC0BDC9}|GetStud.Api\\GetStud.Api.csproj|solutionrelative:getstud.api\\weatherforecast.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -26,50 +14,11 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 4,
+          "SelectedChildIndex": 1,
           "Children": [
             {
               "$type": "Bookmark",
               "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "GetStud.Api",
-              "DocumentMoniker": "C:\\Users\\vladi\\source\\repos\\GetStud\\GetStud.Api\\GetStud.Api.csproj",
-              "RelativeDocumentMoniker": "GetStud.Api\\GetStud.Api.csproj",
-              "ToolTip": "C:\\Users\\vladi\\source\\repos\\GetStud\\GetStud.Api\\GetStud.Api.csproj",
-              "RelativeToolTip": "GetStud.Api\\GetStud.Api.csproj",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAkAAAA8AAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
-              "WhenOpened": "2025-10-07T18:08:31.161Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
-              "Title": "appsettings.json",
-              "DocumentMoniker": "C:\\Users\\vladi\\source\\repos\\GetStud\\GetStud.Api\\appsettings.json",
-              "RelativeDocumentMoniker": "GetStud.Api\\appsettings.json",
-              "ToolTip": "C:\\Users\\vladi\\source\\repos\\GetStud\\GetStud.Api\\appsettings.json",
-              "RelativeToolTip": "GetStud.Api\\appsettings.json",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAkAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
-              "WhenOpened": "2025-10-07T18:08:23.713Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 3,
-              "Title": "WeatherForecast.cs",
-              "DocumentMoniker": "C:\\Users\\vladi\\source\\repos\\GetStud\\GetStud.Api\\WeatherForecast.cs",
-              "RelativeDocumentMoniker": "GetStud.Api\\WeatherForecast.cs",
-              "ToolTip": "C:\\Users\\vladi\\source\\repos\\GetStud\\GetStud.Api\\WeatherForecast.cs",
-              "RelativeToolTip": "GetStud.Api\\WeatherForecast.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-10-07T18:07:17.36Z",
-              "EditorCaption": ""
             },
             {
               "$type": "Document",
@@ -79,7 +28,7 @@
               "RelativeDocumentMoniker": "GetStud.Api\\Program.cs",
               "ToolTip": "C:\\Users\\vladi\\source\\repos\\GetStud\\GetStud.Api\\Program.cs",
               "RelativeToolTip": "GetStud.Api\\Program.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA0AAAAhAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABMAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-10-07T18:07:14.574Z",
               "EditorCaption": ""
