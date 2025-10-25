@@ -7,6 +7,7 @@ public class GeoStudDbContext : DbContext
 {
     public GeoStudDbContext(DbContextOptions<GeoStudDbContext> options) : base(options)
     {
+        base.Database.EnsureCreated();
     }
 
     // Service entities

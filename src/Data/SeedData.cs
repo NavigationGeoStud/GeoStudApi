@@ -14,21 +14,12 @@ public static class SeedData
             {
                 new ServiceClient
                 {
-                    ClientId = "mobile-app",
-                    ClientSecret = BCrypt.Net.BCrypt.HashPassword("MobileAppSecret123!"),
-                    ServiceName = "Mobile Application",
-                    Description = "Mobile application service client",
+                    ClientId = "tgbot",
+                    ClientSecret = BCrypt.Net.BCrypt.HashPassword("TgBotSecret"),
+                    ServiceName = "TelegramBot",
+                    Description = "TelegramBot service client",
                     IsActive = true,
                     AllowedScopes = "read:surveys,write:surveys,read:analytics"
-                },
-                new ServiceClient
-                {
-                    ClientId = "web-app",
-                    ClientSecret = BCrypt.Net.BCrypt.HashPassword("WebAppSecret123!"),
-                    ServiceName = "Web Application",
-                    Description = "Web application service client",
-                    IsActive = true,
-                    AllowedScopes = "read:surveys,write:surveys,read:analytics,delete:surveys"
                 },
                 new ServiceClient
                 {

@@ -28,19 +28,36 @@ public class AuthService : IAuthService
     {
         try
         {
+            _logger.LogInformation("Attempting to authenticate service: {ClientId}", request.ClientId);
+            
             var serviceClient = await _context.ServiceClients
                 .FirstOrDefaultAsync(sc => sc.ClientId == request.ClientId && sc.IsActive && !sc.IsDeleted);
 
-            if (serviceClient == null || !VerifyPassword(request.ClientSecret, serviceClient.ClientSecret))
+            if (serviceClient == null)
             {
+                _logger.LogWarning("Service client not found or inactive: {ClientId}", request.ClientId);
                 return null;
             }
+
+            _logger.LogDebug("Service client found: {ServiceName}, verifying password...", serviceClient.ServiceName);
+
+            if (!VerifyPassword(request.ClientSecret, serviceClient.ClientSecret))
+            {
+                _logger.LogWarning("Invalid password for client: {ClientId}", request.ClientId);
+                return null;
+            }
+
+            _logger.LogDebug("Password verified successfully for client: {ClientId}", request.ClientId);
 
             // Update last used
             serviceClient.LastUsedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
+            _logger.LogDebug("Generating JWT token for client: {ClientId}", request.ClientId);
             var token = GenerateServiceJwtToken(serviceClient);
+            
+            _logger.LogInformation("Successfully authenticated service: {ClientId}", request.ClientId);
+            
             return new AuthResponse
             {
                 AccessToken = token,
@@ -51,7 +68,7 @@ public class AuthService : IAuthService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error authenticating service: {ClientId}", request.ClientId);
-            return null;
+            throw; // Re-throw to trigger 500 error with details
         }
     }
 
@@ -100,30 +117,63 @@ public class AuthService : IAuthService
 
     private string GenerateServiceJwtToken(ServiceClient serviceClient)
     {
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var key = Encoding.ASCII.GetBytes(GetJwtSecret());
-        var tokenDescriptor = new SecurityTokenDescriptor
+        try
         {
-            Subject = new ClaimsIdentity(new[]
+            _logger.LogDebug("Starting JWT token generation for client: {ClientId}", serviceClient.ClientId);
+            
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var jwtSecret = GetJwtSecret() ?? string.Empty;
+            _logger.LogDebug("JWT Secret length: {Length}", jwtSecret.Length);
+            
+            var key = Encoding.UTF8.GetBytes(jwtSecret);
+            
+            var claims = new List<Claim>
             {
-                new Claim("client_id", serviceClient.ClientId),
-                new Claim("service_name", serviceClient.ServiceName),
+                new Claim("client_id", serviceClient.ClientId ?? string.Empty),
                 new Claim("type", "service")
-            }),
-            Expires = DateTime.UtcNow.AddMinutes(GetTokenExpirationMinutes()),
-            Issuer = GetJwtIssuer(),
-            Audience = GetJwtAudience(),
-            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
-        };
+            };
+            
+            if (!string.IsNullOrEmpty(serviceClient.ServiceName))
+            {
+                claims.Add(new Claim("service_name", serviceClient.ServiceName));
+            }
 
-        var token = tokenHandler.CreateToken(tokenDescriptor);
-        return tokenHandler.WriteToken(token);
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(claims),
+                Expires = DateTime.UtcNow.AddMinutes(GetTokenExpirationMinutes()),
+                Issuer = GetJwtIssuer(),
+                Audience = GetJwtAudience(),
+                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+            };
+
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            var tokenString = tokenHandler.WriteToken(token);
+            
+            _logger.LogDebug("JWT token generated successfully for client: {ClientId}", serviceClient.ClientId);
+            return tokenString;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating JWT token for client: {ClientId}", serviceClient.ClientId);
+            throw;
+        }
     }
 
     private bool VerifyPassword(string password, string hash)
     {
-        // Simple hash verification - in production use BCrypt or similar
-        return BCrypt.Net.BCrypt.Verify(password, hash);
+        try
+        {
+            // Simple hash verification - in production use BCrypt or similar
+            var result = BCrypt.Net.BCrypt.Verify(password, hash);
+            _logger.LogDebug("Password verification result: {Result}", result);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error verifying password");
+            return false;
+        }
     }
 
     private string GetJwtSecret()

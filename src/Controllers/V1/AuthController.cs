@@ -47,8 +47,12 @@ public class AuthController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during service login");
-            return StatusCode(500, "Internal server error");
+            _logger.LogError(ex, "Error during service login: {Message}", ex.Message);
+            return StatusCode(500, new { 
+                error = "Internal server error", 
+                message = ex.Message,
+                details = ex.StackTrace
+            });
         }
     }
 
