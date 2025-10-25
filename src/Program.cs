@@ -116,29 +116,29 @@ builder.Services.AddSwaggerGen(c =>
     });
 
     // Add JWT Authentication to Swagger
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-        Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
-        Name = "Authorization",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
-    });
+    //c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    //{
+    //    Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
+    //    Name = "Authorization",
+    //    In = ParameterLocation.Header,
+    //    Type = SecuritySchemeType.ApiKey,
+    //    Scheme = "Bearer"
+    //});
 
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
-    });
+    //c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    //{
+    //    {
+    //        new OpenApiSecurityScheme
+    //        {
+    //            Reference = new OpenApiReference
+    //            {
+    //                Type = ReferenceType.SecurityScheme,
+    //                Id = "Bearer"
+    //            }
+    //        },
+    //        Array.Empty<string>()
+    //    }
+    //});
 
     // Include XML comments
     var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
@@ -183,17 +183,15 @@ else
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
+// Enable Swagger for all environments
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        var swaggerTitle = useSqlite ? "GeoStud API v1 (Local)" : "GeoStud API v1";
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", swaggerTitle);
-        c.RoutePrefix = string.Empty; // Set Swagger UI at the app's root
-        c.DocumentTitle = useSqlite ? "GeoStud API - Local Development" : "GeoStud API";
-    });
-}
+    var swaggerTitle = useSqlite ? "GeoStud API v1 (Local)" : "GeoStud API v1";
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", swaggerTitle);
+    c.RoutePrefix = string.Empty; // Set Swagger UI at the app's root
+    c.DocumentTitle = useSqlite ? "GeoStud API - Local Development" : "GeoStud API";
+});
 
 app.UseHttpsRedirection();
 
