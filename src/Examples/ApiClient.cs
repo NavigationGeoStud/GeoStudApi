@@ -178,20 +178,8 @@ public static class ApiClientExample
 
         Console.WriteLine("=== GeoStud API Client Example ===\n");
 
-        // Пример 1: Аутентификация пользователя
-        Console.WriteLine("1. User Authentication:");
-        var userLoginSuccess = await client.LoginAsync("admin", "Admin123!");
-        Console.WriteLine($"Login result: {userLoginSuccess}");
-
-        if (userLoginSuccess)
-        {
-            // Получить профиль пользователя
-            var userProfile = await client.GetCurrentUserAsync();
-            Console.WriteLine($"User profile: {userProfile}\n");
-        }
-
-        // Пример 2: Аутентификация сервиса
-        Console.WriteLine("2. Service Authentication:");
+        // Пример 1: Аутентификация сервиса
+        Console.WriteLine("1. Service Authentication:");
         var serviceLoginSuccess = await client.ServiceLoginAsync("mobile-app", "MobileAppSecret123!");
         Console.WriteLine($"Service login result: {serviceLoginSuccess}\n");
 

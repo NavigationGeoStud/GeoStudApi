@@ -18,38 +18,6 @@ public class AuthController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>
-    /// Authenticate user with username and password
-    /// </summary>
-    /// <param name="request">Login credentials</param>
-    /// <returns>JWT token for authenticated user</returns>
-    [HttpPost("login")]
-    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> Login([FromBody] LoginRequest request)
-    {
-        try
-        {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
-
-            var response = await _authService.AuthenticateUserAsync(request);
-            if (response == null)
-            {
-                return Unauthorized("Invalid username or password");
-            }
-
-            return Ok(response);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error during user login");
-            return StatusCode(500, "Internal server error");
-        }
-    }
 
     /// <summary>
     /// Authenticate service with client credentials

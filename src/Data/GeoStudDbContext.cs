@@ -9,12 +9,7 @@ public class GeoStudDbContext : DbContext
     {
     }
 
-    // Legacy entities (for backward compatibility)
-    public DbSet<User> Users { get; set; }
-    public DbSet<Role> Roles { get; set; }
-    public DbSet<UserRole> UserRoles { get; set; }
-    public DbSet<Permission> Permissions { get; set; }
-    public DbSet<RolePermission> RolePermissions { get; set; }
+    // Service entities
     public DbSet<ServiceClient> ServiceClients { get; set; }
     
     // GeoStud entities
@@ -26,57 +21,6 @@ public class GeoStudDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // User configuration
-        modelBuilder.Entity<User>(entity =>
-        {
-            entity.HasIndex(e => e.Username).IsUnique();
-            entity.HasIndex(e => e.Email).IsUnique();
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
-        });
-
-        // Role configuration
-        modelBuilder.Entity<Role>(entity =>
-        {
-            entity.HasIndex(e => e.Name).IsUnique();
-        });
-
-        // UserRole configuration
-        modelBuilder.Entity<UserRole>(entity =>
-        {
-            entity.HasKey(e => new { e.UserId, e.RoleId });
-            entity.HasOne(e => e.User)
-                .WithMany(u => u.UserRoles)
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Cascade)
-                .IsRequired(false); // Make navigation optional to avoid filter issues
-            entity.HasOne(e => e.Role)
-                .WithMany(r => r.UserRoles)
-                .HasForeignKey(e => e.RoleId)
-                .OnDelete(DeleteBehavior.Cascade)
-                .IsRequired(false); // Make navigation optional to avoid filter issues
-        });
-
-        // Permission configuration
-        modelBuilder.Entity<Permission>(entity =>
-        {
-            entity.HasIndex(e => new { e.Resource, e.Action }).IsUnique();
-        });
-
-        // RolePermission configuration
-        modelBuilder.Entity<RolePermission>(entity =>
-        {
-            entity.HasKey(e => new { e.RoleId, e.PermissionId });
-            entity.HasOne(e => e.Role)
-                .WithMany(r => r.RolePermissions)
-                .HasForeignKey(e => e.RoleId)
-                .OnDelete(DeleteBehavior.Cascade)
-                .IsRequired(false); // Make navigation optional to avoid filter issues
-            entity.HasOne(e => e.Permission)
-                .WithMany(p => p.RolePermissions)
-                .HasForeignKey(e => e.PermissionId)
-                .OnDelete(DeleteBehavior.Cascade)
-                .IsRequired(false); // Make navigation optional to avoid filter issues
-        });
 
         // ServiceClient configuration
         modelBuilder.Entity<ServiceClient>(entity =>
@@ -117,15 +61,10 @@ public class GeoStudDbContext : DbContext
         });
 
         // Global query filters for soft delete
-        // Note: We'll apply filters selectively to avoid navigation issues
-        modelBuilder.Entity<User>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<ServiceClient>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<Student>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<StudentResponse>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<AnalyticsData>().HasQueryFilter(e => !e.IsDeleted);
-        
-        // For Role and Permission, we'll handle soft delete in application logic
-        // to avoid navigation property issues with UserRole and RolePermission
     }
 
     public override int SaveChanges()

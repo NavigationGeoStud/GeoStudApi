@@ -16,22 +16,22 @@ public class SurveyClient : IDisposable
     }
 
     /// <summary>
-    /// Аутентификация пользователя
+    /// Аутентификация сервиса
     /// </summary>
-    public async Task<bool> LoginAsync(string username, string password)
+    public async Task<bool> ServiceLoginAsync(string clientId, string clientSecret)
     {
         try
         {
-            var loginRequest = new
+            var serviceRequest = new
             {
-                username,
-                password
+                clientId,
+                clientSecret
             };
 
-            var json = JsonSerializer.Serialize(loginRequest);
+            var json = JsonSerializer.Serialize(serviceRequest);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync($"{_baseUrl}/api/v1/auth/login", content);
+            var response = await _httpClient.PostAsync($"{_baseUrl}/api/v1/auth/service-login", content);
             
             if (response.IsSuccessStatusCode)
             {
@@ -51,7 +51,7 @@ public class SurveyClient : IDisposable
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Login error: {ex.Message}");
+            Console.WriteLine($"Service login error: {ex.Message}");
             return false;
         }
     }
@@ -166,10 +166,10 @@ public static class SurveyClientExample
 
         Console.WriteLine("=== GeoStud Survey API Client Example ===\n");
 
-        // Пример 1: Аутентификация
-        Console.WriteLine("1. User Authentication:");
-        var loginSuccess = await client.LoginAsync("admin", "Admin123!");
-        Console.WriteLine($"Login result: {loginSuccess}\n");
+        // Пример 1: Аутентификация сервиса
+        Console.WriteLine("1. Service Authentication:");
+        var loginSuccess = await client.ServiceLoginAsync("mobile-app", "MobileAppSecret123!");
+        Console.WriteLine($"Service login result: {loginSuccess}\n");
 
         if (loginSuccess)
         {
