@@ -17,6 +17,11 @@ public class GeoStudDbContext : DbContext
     public DbSet<Student> Students { get; set; }
     public DbSet<StudentResponse> StudentResponses { get; set; }
     public DbSet<AnalyticsData> AnalyticsData { get; set; }
+    
+    // Location entities
+    public DbSet<Location> Locations { get; set; }
+    public DbSet<LocationCategory> LocationCategories { get; set; }
+    public DbSet<LocationCategoryJoin> LocationCategoryJoins { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -61,11 +66,47 @@ public class GeoStudDbContext : DbContext
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
         });
 
+        // Location configuration
+        modelBuilder.Entity<Location>(entity =>
+        {
+            entity.HasIndex(e => e.Name);
+            entity.HasIndex(e => e.Coordinates);
+            entity.HasIndex(e => e.City);
+            entity.HasIndex(e => e.IsActive);
+            entity.HasIndex(e => e.IsVerified);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+        });
+
+        // LocationCategory configuration
+        modelBuilder.Entity<LocationCategory>(entity =>
+        {
+            entity.HasIndex(e => e.Name).IsUnique();
+            entity.HasIndex(e => e.DisplayOrder);
+            entity.HasIndex(e => e.IsActive);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+        });
+
+        // LocationCategoryJoin configuration (many-to-many)
+        modelBuilder.Entity<LocationCategoryJoin>(entity =>
+        {
+            entity.HasKey(e => new { e.LocationId, e.CategoryId });
+            entity.HasOne(e => e.Location)
+                .WithMany(l => l.CategoryJoins)
+                .HasForeignKey(e => e.LocationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Category)
+                .WithMany(c => c.LocationJoins)
+                .HasForeignKey(e => e.CategoryId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // Global query filters for soft delete
         modelBuilder.Entity<ServiceClient>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<Student>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<StudentResponse>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<AnalyticsData>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<Location>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<LocationCategory>().HasQueryFilter(e => !e.IsDeleted);
     }
 
     public override int SaveChanges()
