@@ -14,7 +14,7 @@ public class Location : BaseEntity
     
     [Required]
     [MaxLength(50)]
-    public string Coordinates { get; set; } = string.Empty; // Format: "latitude,longitude" (e.g., "55.751244,37.618423")
+    public string Coordinates { get; set; } = string.Empty; 
     
     [MaxLength(255)]
     public string? Address { get; set; }
@@ -36,16 +36,16 @@ public class Location : BaseEntity
     public int? RatingCount { get; set; }
     
     [MaxLength(20)]
-    public string? PriceRange { get; set; } // "Free", "Low", "Medium", "High"
+    public string? PriceRange { get; set; } 
     
     [MaxLength(100)]
-    public string? WorkingHours { get; set; } // "9:00-18:00", JSON format, etc.
+    public string? WorkingHours { get; set; } 
     
     public bool IsActive { get; set; } = true;
     
     public bool IsVerified { get; set; } = false;
     
-    // Navigation properties
+    
     public virtual ICollection<LocationCategoryJoin> CategoryJoins { get; set; } = new List<LocationCategoryJoin>();
 }
 
