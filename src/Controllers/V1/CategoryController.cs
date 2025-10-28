@@ -151,7 +151,18 @@ public class CategoryController : ControllerBase
                 }).ToList()
             }).ToList();
 
-            return Ok(new { category, locations = responses });
+            return Ok(new { 
+                category = new {
+                    category.Id,
+                    category.Name,
+                    category.IconName,
+                    category.Description,
+                    category.DisplayOrder,
+                    category.IsActive,
+                    category.CreatedAt
+                }, 
+                locations = responses 
+            });
         }
         catch (Exception ex)
         {

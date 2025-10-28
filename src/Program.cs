@@ -25,7 +25,12 @@ Console.WriteLine($"🔧 Database Provider: {(useSqlite ? "SQLite" : "SQL Server
 Console.WriteLine($"🌍 Environment: {builder.Environment.EnvironmentName}");
 
 // Add services to the container
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+    });
 
 // Database - Configure based on mode
 if (useSqlite)
@@ -217,7 +222,9 @@ app.MapControllers();
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<GeoStudDbContext>();
-    context.Database.EnsureCreated();
+    
+    // Apply migrations
+    context.Database.Migrate();
     
     // Seed initial data
     await GeoStud.Api.Data.SeedData.SeedAsync(context);

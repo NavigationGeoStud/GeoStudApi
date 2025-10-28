@@ -7,7 +7,6 @@ public class GeoStudDbContext : DbContext
 {
     public GeoStudDbContext(DbContextOptions<GeoStudDbContext> options) : base(options)
     {
-        base.Database.EnsureCreated();
     }
 
     // Service entities
@@ -90,6 +89,7 @@ public class GeoStudDbContext : DbContext
         modelBuilder.Entity<LocationCategoryJoin>(entity =>
         {
             entity.HasKey(e => new { e.LocationId, e.CategoryId });
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
             entity.HasOne(e => e.Location)
                 .WithMany(l => l.CategoryJoins)
                 .HasForeignKey(e => e.LocationId)
@@ -107,6 +107,7 @@ public class GeoStudDbContext : DbContext
         modelBuilder.Entity<AnalyticsData>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<Location>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<LocationCategory>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<LocationCategoryJoin>().HasQueryFilter(e => !e.IsDeleted);
     }
 
     public override int SaveChanges()

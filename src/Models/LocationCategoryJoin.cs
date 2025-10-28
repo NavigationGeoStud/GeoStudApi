@@ -1,6 +1,6 @@
 namespace GeoStud.Api.Models;
 
-public class LocationCategoryJoin
+public class LocationCategoryJoin : BaseEntity
 {
     public int LocationId { get; set; }
     public virtual Location Location { get; set; } = null!;
