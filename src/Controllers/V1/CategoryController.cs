@@ -122,8 +122,6 @@ public class CategoryController : ControllerBase
 
             var locations = await _context.Locations
                 .Where(l => l.CategoryJoins.Any(cj => cj.CategoryId == id) && !l.IsDeleted)
-                .Include(l => l.CategoryJoins)
-                    .ThenInclude(cj => cj.Category)
                 .ToListAsync();
 
             var responses = locations.Select(l => new
@@ -142,13 +140,7 @@ public class CategoryController : ControllerBase
                 l.PriceRange,
                 l.WorkingHours,
                 l.IsActive,
-                l.IsVerified,
-                Categories = l.CategoryJoins.Select(cj => new
-                {
-                    cj.Category.Id,
-                    cj.Category.Name,
-                    cj.Category.IconName
-                }).ToList()
+                l.IsVerified
             }).ToList();
 
             return Ok(new { 
