@@ -19,7 +19,7 @@ public class LocationCategory : BaseEntity
     public bool IsActive { get; set; } = true;
     
     // Navigation properties
-    public virtual ICollection<LocationCategoryJoin> LocationJoins { get; set; } = new List<LocationCategoryJoin>();
+    public virtual ICollection<Location> Locations { get; set; } = new List<Location>();
     public virtual ICollection<LocationSubcategory> Subcategories { get; set; } = new List<LocationSubcategory>();
 }
 

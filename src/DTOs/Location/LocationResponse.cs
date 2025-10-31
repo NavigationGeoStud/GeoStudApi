@@ -20,7 +20,7 @@ public class LocationResponse
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     
-    public List<CategoryInfo> Categories { get; set; } = new();
+    public CategoryInfo Category { get; set; } = null!;
     
     public List<SubcategoryInfo> Subcategories { get; set; } = new();
     

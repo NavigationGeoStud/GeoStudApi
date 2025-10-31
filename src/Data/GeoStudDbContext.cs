@@ -22,7 +22,6 @@ public class GeoStudDbContext : DbContext
     public DbSet<Location> Locations { get; set; }
     public DbSet<LocationCategory> LocationCategories { get; set; }
     public DbSet<LocationSubcategory> LocationSubcategories { get; set; }
-    public DbSet<LocationCategoryJoin> LocationCategoryJoins { get; set; }
     public DbSet<LocationSubcategoryJoin> LocationSubcategoryJoins { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -77,6 +76,7 @@ public class GeoStudDbContext : DbContext
             entity.HasIndex(e => e.City);
             entity.HasIndex(e => e.IsActive);
             entity.HasIndex(e => e.IsVerified);
+            entity.HasIndex(e => e.CategoryId);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
         });
 
@@ -87,6 +87,10 @@ public class GeoStudDbContext : DbContext
             entity.HasIndex(e => e.DisplayOrder);
             entity.HasIndex(e => e.IsActive);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.HasMany(e => e.Locations)
+                .WithOne(l => l.Category)
+                .HasForeignKey(l => l.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // LocationSubcategory configuration
@@ -98,21 +102,6 @@ public class GeoStudDbContext : DbContext
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
             entity.HasOne(e => e.Category)
                 .WithMany(c => c.Subcategories)
-                .HasForeignKey(e => e.CategoryId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        // LocationCategoryJoin configuration (many-to-many)
-        modelBuilder.Entity<LocationCategoryJoin>(entity =>
-        {
-            entity.HasKey(e => new { e.LocationId, e.CategoryId });
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
-            entity.HasOne(e => e.Location)
-                .WithMany(l => l.CategoryJoins)
-                .HasForeignKey(e => e.LocationId)
-                .OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne(e => e.Category)
-                .WithMany(c => c.LocationJoins)
                 .HasForeignKey(e => e.CategoryId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
@@ -157,7 +146,6 @@ public class GeoStudDbContext : DbContext
         modelBuilder.Entity<Location>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<LocationCategory>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<LocationSubcategory>().HasQueryFilter(e => !e.IsDeleted);
-        modelBuilder.Entity<LocationCategoryJoin>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<LocationSubcategoryJoin>().HasQueryFilter(e => !e.IsDeleted);
     }
 

@@ -121,7 +121,7 @@ public class CategoryController : ControllerBase
             }
 
             var locations = await _context.Locations
-                .Where(l => l.CategoryJoins.Any(cj => cj.CategoryId == id) && !l.IsDeleted)
+                .Where(l => l.CategoryId == id && !l.IsDeleted)
                 .ToListAsync();
 
             var responses = locations.Select(l => new

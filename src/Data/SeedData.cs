@@ -224,6 +224,11 @@ public static class SeedData
         // Seed test locations
         if (!context.Locations.Any())
         {
+            // Get categories first
+            var cafeCategory = await context.LocationCategories.FirstAsync(c => c.Name == "Кафе и рестораны");
+            var educationCategory = await context.LocationCategories.FirstAsync(c => c.Name == "Учеба");
+            var sportCategory = await context.LocationCategories.FirstAsync(c => c.Name == "Спорт");
+            
             var locations = new List<Location>
             {
                 new Location
@@ -241,7 +246,8 @@ public static class SeedData
                     PriceRange = "$$",
                     WorkingHours = "09:00-22:00",
                     IsActive = true,
-                    IsVerified = true
+                    IsVerified = true,
+                    CategoryId = cafeCategory.Id
                 },
                 new Location
                 {
@@ -258,7 +264,8 @@ public static class SeedData
                     PriceRange = "Free",
                     WorkingHours = "09:00-21:00",
                     IsActive = true,
-                    IsVerified = true
+                    IsVerified = true,
+                    CategoryId = educationCategory.Id
                 },
                 new Location
                 {
@@ -275,30 +282,12 @@ public static class SeedData
                     PriceRange = "$$$",
                     WorkingHours = "06:00-24:00",
                     IsActive = true,
-                    IsVerified = true
+                    IsVerified = true,
+                    CategoryId = sportCategory.Id
                 }
             };
             
             context.Locations.AddRange(locations);
-            await context.SaveChangesAsync();
-            
-            // Add category associations
-            var cafeCategory = await context.LocationCategories.FirstAsync(c => c.Name == "Кафе и рестораны");
-            var educationCategory = await context.LocationCategories.FirstAsync(c => c.Name == "Учеба");
-            var sportCategory = await context.LocationCategories.FirstAsync(c => c.Name == "Спорт");
-            
-            var cafeLocation = await context.Locations.FirstAsync(l => l.Name == "Кафе Центр");
-            var libraryLocation = await context.Locations.FirstAsync(l => l.Name == "Библиотека им. Ленина");
-            var sportLocation = await context.Locations.FirstAsync(l => l.Name == "Спорткомплекс Олимпийский");
-            
-            var categoryJoins = new List<LocationCategoryJoin>
-            {
-                new LocationCategoryJoin { LocationId = cafeLocation.Id, CategoryId = cafeCategory.Id },
-                new LocationCategoryJoin { LocationId = libraryLocation.Id, CategoryId = educationCategory.Id },
-                new LocationCategoryJoin { LocationId = sportLocation.Id, CategoryId = sportCategory.Id }
-            };
-            
-            context.LocationCategoryJoins.AddRange(categoryJoins);
             await context.SaveChangesAsync();
         }
     }

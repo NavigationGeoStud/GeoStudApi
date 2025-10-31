@@ -45,9 +45,11 @@ public class Location : BaseEntity
     
     public bool IsVerified { get; set; } = false;
     
+    [Required]
+    public int CategoryId { get; set; }
     
     // Navigation properties
-    public virtual ICollection<LocationCategoryJoin> CategoryJoins { get; set; } = new List<LocationCategoryJoin>();
+    public virtual LocationCategory Category { get; set; } = null!;
     public virtual ICollection<LocationSubcategoryJoin> SubcategoryJoins { get; set; } = new List<LocationSubcategoryJoin>();
     public virtual ICollection<FavoriteLocation> FavoriteLocations { get; set; } = new List<FavoriteLocation>();
 }
