@@ -16,6 +16,7 @@ public class GeoStudDbContext : DbContext
     public DbSet<Student> Students { get; set; }
     public DbSet<StudentResponse> StudentResponses { get; set; }
     public DbSet<AnalyticsData> AnalyticsData { get; set; }
+    public DbSet<FavoriteLocation> FavoriteLocations { get; set; }
     
     // Location entities
     public DbSet<Location> Locations { get; set; }
@@ -115,11 +116,28 @@ public class GeoStudDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // FavoriteLocation configuration
+        modelBuilder.Entity<FavoriteLocation>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.StudentId, e.LocationId }).IsUnique();
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.HasOne(e => e.Student)
+                .WithMany(s => s.FavoriteLocations)
+                .HasForeignKey(e => e.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Location)
+                .WithMany(l => l.FavoriteLocations)
+                .HasForeignKey(e => e.LocationId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // Global query filters for soft delete
         modelBuilder.Entity<ServiceClient>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<Student>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<StudentResponse>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<AnalyticsData>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<FavoriteLocation>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<Location>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<LocationCategory>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<LocationSubcategory>().HasQueryFilter(e => !e.IsDeleted);

@@ -59,4 +59,5 @@ public class Student : BaseEntity
     
     // Navigation properties
     public virtual ICollection<StudentResponse> Responses { get; set; } = new List<StudentResponse>();
+    public virtual ICollection<FavoriteLocation> FavoriteLocations { get; set; } = new List<FavoriteLocation>();
 }
