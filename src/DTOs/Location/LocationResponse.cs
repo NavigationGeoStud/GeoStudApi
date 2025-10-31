@@ -22,11 +22,20 @@ public class LocationResponse
     
     public List<CategoryInfo> Categories { get; set; } = new();
     
+    public List<SubcategoryInfo> Subcategories { get; set; } = new();
+    
     public class CategoryInfo
     {
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public string? IconName { get; set; }
+    }
+    
+    public class SubcategoryInfo
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public int CategoryId { get; set; }
     }
 }
 

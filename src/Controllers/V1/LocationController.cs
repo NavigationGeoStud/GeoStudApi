@@ -26,12 +26,13 @@ public class LocationController : ControllerBase
     /// Get all locations
     /// </summary>
     /// <param name="categoryId">Optional category filter</param>
+    /// <param name="subcategoryId">Optional subcategory filter</param>
     /// <param name="city">Optional city filter</param>
     /// <returns>List of locations</returns>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<LocationResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetLocations([FromQuery] int? categoryId = null, [FromQuery] string? city = null)
+    public async Task<IActionResult> GetLocations([FromQuery] int? categoryId = null, [FromQuery] int? subcategoryId = null, [FromQuery] string? city = null)
     {
         try
         {
@@ -43,6 +44,12 @@ public class LocationController : ControllerBase
                 query = query.Where(l => l.CategoryJoins.Any(cj => cj.CategoryId == categoryId.Value));
             }
 
+            // Filter by subcategory if provided
+            if (subcategoryId.HasValue)
+            {
+                query = query.Where(l => l.SubcategoryJoins.Any(sj => sj.SubcategoryId == subcategoryId.Value));
+            }
+
             // Filter by city if provided
             if (!string.IsNullOrWhiteSpace(city))
             {
@@ -52,6 +59,8 @@ public class LocationController : ControllerBase
             var locations = await query
                 .Include(l => l.CategoryJoins)
                     .ThenInclude(cj => cj.Category)
+                .Include(l => l.SubcategoryJoins)
+                    .ThenInclude(sj => sj.Subcategory)
                 .ToListAsync();
 
             var responses = locations.Select(ToLocationResponse).ToList();
@@ -80,6 +89,8 @@ public class LocationController : ControllerBase
             var location = await _context.Locations
                 .Include(l => l.CategoryJoins)
                     .ThenInclude(cj => cj.Category)
+                .Include(l => l.SubcategoryJoins)
+                    .ThenInclude(sj => sj.Subcategory)
                 .FirstOrDefaultAsync(l => l.Id == id && !l.IsDeleted);
 
             if (location == null)
@@ -122,6 +133,8 @@ public class LocationController : ControllerBase
                 .Where(l => l.CategoryJoins.Any(cj => cj.CategoryId == categoryId) && !l.IsDeleted)
                 .Include(l => l.CategoryJoins)
                     .ThenInclude(cj => cj.Category)
+                .Include(l => l.SubcategoryJoins)
+                    .ThenInclude(sj => sj.Subcategory)
                 .ToListAsync();
 
             var responses = locations.Select(ToLocationResponse).ToList();
@@ -196,11 +209,34 @@ public class LocationController : ControllerBase
                 await _context.SaveChangesAsync();
             }
 
-            // Reload with categories
+            // Add subcategory associations
+            if (request.SubcategoryIds.Any())
+            {
+                var validSubcategories = await _context.LocationSubcategories
+                    .Where(s => request.SubcategoryIds.Contains(s.Id) && s.IsActive)
+                    .ToListAsync();
+
+                var subcategoryJoins = validSubcategories.Select(s => new LocationSubcategoryJoin
+                {
+                    LocationId = location.Id,
+                    SubcategoryId = s.Id
+                }).ToList();
+
+                _context.LocationSubcategoryJoins.AddRange(subcategoryJoins);
+                await _context.SaveChangesAsync();
+            }
+
+            // Reload with categories and subcategories
             await _context.Entry(location)
                 .Collection(l => l.CategoryJoins)
                 .Query()
                 .Include(cj => cj.Category)
+                .LoadAsync();
+                
+            await _context.Entry(location)
+                .Collection(l => l.SubcategoryJoins)
+                .Query()
+                .Include(sj => sj.Subcategory)
                 .LoadAsync();
 
             var response = ToLocationResponse(location);
@@ -241,6 +277,7 @@ public class LocationController : ControllerBase
 
             var location = await _context.Locations
                 .Include(l => l.CategoryJoins)
+                .Include(l => l.SubcategoryJoins)
                 .FirstOrDefaultAsync(l => l.Id == id && !l.IsDeleted);
 
             if (location == null)
@@ -297,13 +334,52 @@ public class LocationController : ControllerBase
                 _context.LocationCategoryJoins.AddRange(newJoins);
             }
 
+            // Update subcategory associations
+            var existingSubcategoryIds = location.SubcategoryJoins.Select(sj => sj.SubcategoryId).ToList();
+            var newSubcategoryIds = request.SubcategoryIds.ToList();
+
+            // Remove old subcategory associations
+            var subcategoriesToRemove = location.SubcategoryJoins
+                .Where(sj => !newSubcategoryIds.Contains(sj.SubcategoryId))
+                .ToList();
+            foreach (var join in subcategoriesToRemove)
+            {
+                _context.LocationSubcategoryJoins.Remove(join);
+            }
+
+            // Add new subcategory associations
+            var subcategoriesToAdd = newSubcategoryIds
+                .Where(sid => !existingSubcategoryIds.Contains(sid))
+                .ToList();
+
+            if (subcategoriesToAdd.Any())
+            {
+                var validSubcategories = await _context.LocationSubcategories
+                    .Where(s => subcategoriesToAdd.Contains(s.Id) && s.IsActive)
+                    .ToListAsync();
+
+                var newSubcategoryJoins = validSubcategories.Select(s => new LocationSubcategoryJoin
+                {
+                    LocationId = location.Id,
+                    SubcategoryId = s.Id
+                }).ToList();
+
+                _context.LocationSubcategoryJoins.AddRange(newSubcategoryJoins);
+            }
+
             await _context.SaveChangesAsync();
 
-            // Reload with categories
+            // Reload with categories and subcategories
             await _context.Entry(location)
                 .Collection(l => l.CategoryJoins)
                 .Query()
                 .Include(cj => cj.Category)
+                .LoadAsync();
+                
+            await _context.Entry(location)
+                .Collection(l => l.SubcategoryJoins)
+                .Query()
+                .Include(sj => sj.Subcategory)
                 .LoadAsync();
 
             var response = ToLocationResponse(location);
@@ -411,6 +487,8 @@ public class LocationController : ControllerBase
             var locations = await _context.Locations
                 .Include(l => l.CategoryJoins)
                     .ThenInclude(cj => cj.Category)
+                .Include(l => l.SubcategoryJoins)
+                    .ThenInclude(sj => sj.Subcategory)
                 .ToListAsync();
 
             var nearby = locations.Where(l =>
@@ -464,6 +542,14 @@ public class LocationController : ControllerBase
                     Id = cj.Category.Id,
                     Name = cj.Category.Name,
                     IconName = cj.Category.IconName
+                })
+                .ToList(),
+            Subcategories = location.SubcategoryJoins
+                .Select(sj => new LocationResponse.SubcategoryInfo
+                {
+                    Id = sj.Subcategory.Id,
+                    Name = sj.Subcategory.Name,
+                    CategoryId = sj.Subcategory.CategoryId
                 })
                 .ToList()
         };

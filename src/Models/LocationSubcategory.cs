@@ -20,5 +20,6 @@ public class LocationSubcategory : BaseEntity
     
     // Navigation properties
     public virtual LocationCategory Category { get; set; } = null!;
+    public virtual ICollection<LocationSubcategoryJoin> LocationJoins { get; set; } = new List<LocationSubcategoryJoin>();
 }
 

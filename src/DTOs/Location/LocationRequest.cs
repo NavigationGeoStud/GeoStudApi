@@ -45,5 +45,7 @@ public class LocationRequest
     public bool IsVerified { get; set; } = false;
     
     public List<int> CategoryIds { get; set; } = new();
+    
+    public List<int> SubcategoryIds { get; set; } = new();
 }
 

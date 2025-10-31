@@ -23,6 +23,7 @@ public class GeoStudDbContext : DbContext
     public DbSet<LocationCategory> LocationCategories { get; set; }
     public DbSet<LocationSubcategory> LocationSubcategories { get; set; }
     public DbSet<LocationCategoryJoin> LocationCategoryJoins { get; set; }
+    public DbSet<LocationSubcategoryJoin> LocationSubcategoryJoins { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -116,6 +117,21 @@ public class GeoStudDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // LocationSubcategoryJoin configuration (many-to-many)
+        modelBuilder.Entity<LocationSubcategoryJoin>(entity =>
+        {
+            entity.HasKey(e => new { e.LocationId, e.SubcategoryId });
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.HasOne(e => e.Location)
+                .WithMany(l => l.SubcategoryJoins)
+                .HasForeignKey(e => e.LocationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Subcategory)
+                .WithMany(s => s.LocationJoins)
+                .HasForeignKey(e => e.SubcategoryId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // FavoriteLocation configuration
         modelBuilder.Entity<FavoriteLocation>(entity =>
         {
@@ -142,6 +158,7 @@ public class GeoStudDbContext : DbContext
         modelBuilder.Entity<LocationCategory>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<LocationSubcategory>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<LocationCategoryJoin>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<LocationSubcategoryJoin>().HasQueryFilter(e => !e.IsDeleted);
     }
 
     public override int SaveChanges()
