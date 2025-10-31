@@ -3,6 +3,7 @@ namespace GeoStud.Api.DTOs.Survey;
 public class SurveyResponse
 {
     public int StudentId { get; set; }
+    public long? TelegramId { get; set; }
     public string Username { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string AgeRange { get; set; } = string.Empty;

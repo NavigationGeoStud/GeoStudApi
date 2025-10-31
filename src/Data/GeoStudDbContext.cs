@@ -39,6 +39,7 @@ public class GeoStudDbContext : DbContext
         {
             entity.HasIndex(e => e.Username).IsUnique();
             entity.HasIndex(e => e.Email).IsUnique();
+            entity.HasIndex(e => e.TelegramId).IsUnique();
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
             entity.HasIndex(e => e.AgeRange);
             entity.HasIndex(e => e.Gender);

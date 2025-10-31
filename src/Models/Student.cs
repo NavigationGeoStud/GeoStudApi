@@ -22,6 +22,8 @@ public class Student : BaseEntity
     [MaxLength(100)]
     public string? LastName { get; set; }
     
+    public long? TelegramId { get; set; }
+    
     // Survey data
     [Required]
     [MaxLength(20)]
