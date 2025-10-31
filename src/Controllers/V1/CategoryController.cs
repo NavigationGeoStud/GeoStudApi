@@ -162,5 +162,119 @@ public class CategoryController : ControllerBase
             return StatusCode(500, new { error = "Internal server error", message = ex.Message });
         }
     }
+
+    /// <summary>
+    /// Get all subcategories
+    /// </summary>
+    /// <returns>List of subcategories</returns>
+    [HttpGet("subcategories")]
+    [ProducesResponseType(typeof(IEnumerable<SubcategoryResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetSubcategories()
+    {
+        try
+        {
+            var subcategories = await _context.LocationSubcategories
+                .Where(s => !s.IsDeleted)
+                .OrderBy(s => s.DisplayOrder)
+                .ToListAsync();
+
+            var responses = subcategories.Select(s => new SubcategoryResponse
+            {
+                Id = s.Id,
+                Name = s.Name,
+                CategoryId = s.CategoryId,
+                Description = s.Description,
+                DisplayOrder = s.DisplayOrder,
+                IsActive = s.IsActive,
+                CreatedAt = s.CreatedAt
+            }).ToList();
+
+            return Ok(responses);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving subcategories");
+            return StatusCode(500, new { error = "Internal server error", message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get subcategories by category ID
+    /// </summary>
+    /// <param name="categoryId">Category ID</param>
+    /// <returns>List of subcategories in category</returns>
+    [HttpGet("subcategories/by-category/{categoryId}")]
+    [ProducesResponseType(typeof(IEnumerable<SubcategoryResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetSubcategoriesByCategory(int categoryId)
+    {
+        try
+        {
+            var subcategories = await _context.LocationSubcategories
+                .Where(s => s.CategoryId == categoryId && !s.IsDeleted)
+                .OrderBy(s => s.DisplayOrder)
+                .ToListAsync();
+
+            var responses = subcategories.Select(s => new SubcategoryResponse
+            {
+                Id = s.Id,
+                Name = s.Name,
+                CategoryId = s.CategoryId,
+                Description = s.Description,
+                DisplayOrder = s.DisplayOrder,
+                IsActive = s.IsActive,
+                CreatedAt = s.CreatedAt
+            }).ToList();
+
+            return Ok(responses);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving subcategories for category {CategoryId}", categoryId);
+            return StatusCode(500, new { error = "Internal server error", message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get subcategory by ID
+    /// </summary>
+    /// <param name="id">Subcategory ID</param>
+    /// <returns>Subcategory details</returns>
+    [HttpGet("subcategories/{id}")]
+    [ProducesResponseType(typeof(SubcategoryResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetSubcategory(int id)
+    {
+        try
+        {
+            var subcategory = await _context.LocationSubcategories
+                .FirstOrDefaultAsync(s => s.Id == id && !s.IsDeleted);
+
+            if (subcategory == null)
+            {
+                return NotFound();
+            }
+
+            var response = new SubcategoryResponse
+            {
+                Id = subcategory.Id,
+                Name = subcategory.Name,
+                CategoryId = subcategory.CategoryId,
+                Description = subcategory.Description,
+                DisplayOrder = subcategory.DisplayOrder,
+                IsActive = subcategory.IsActive,
+                CreatedAt = subcategory.CreatedAt
+            };
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving subcategory {Id}", id);
+            return StatusCode(500, new { error = "Internal server error", message = ex.Message });
+        }
+    }
 }
 

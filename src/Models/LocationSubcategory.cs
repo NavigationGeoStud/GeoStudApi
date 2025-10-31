@@ -2,14 +2,14 @@ using System.ComponentModel.DataAnnotations;
 
 namespace GeoStud.Api.Models;
 
-public class LocationCategory : BaseEntity
+public class LocationSubcategory : BaseEntity
 {
     [Required]
     [MaxLength(100)]
     public string Name { get; set; } = string.Empty;
     
-    [MaxLength(50)]
-    public string? IconName { get; set; }
+    [Required]
+    public int CategoryId { get; set; }
     
     [MaxLength(500)]
     public string? Description { get; set; }
@@ -19,7 +19,6 @@ public class LocationCategory : BaseEntity
     public bool IsActive { get; set; } = true;
     
     // Navigation properties
-    public virtual ICollection<LocationCategoryJoin> LocationJoins { get; set; } = new List<LocationCategoryJoin>();
-    public virtual ICollection<LocationSubcategory> Subcategories { get; set; } = new List<LocationSubcategory>();
+    public virtual LocationCategory Category { get; set; } = null!;
 }
 
