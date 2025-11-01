@@ -4,6 +4,8 @@ namespace GeoStud.Api.DTOs.Survey;
 
 public class SurveyRequest
 {
+    public long? TelegramId { get; set; }
+    
     [Required]
     [MaxLength(20)]
     public string AgeRange { get; set; } = string.Empty;

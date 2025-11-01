@@ -22,6 +22,8 @@ public class Student : BaseEntity
     [MaxLength(100)]
     public string? LastName { get; set; }
     
+    public long? TelegramId { get; set; }
+    
     // Survey data
     [Required]
     [MaxLength(20)]
@@ -57,4 +59,5 @@ public class Student : BaseEntity
     
     // Navigation properties
     public virtual ICollection<StudentResponse> Responses { get; set; } = new List<StudentResponse>();
+    public virtual ICollection<FavoriteLocation> FavoriteLocations { get; set; } = new List<FavoriteLocation>();
 }

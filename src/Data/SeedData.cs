@@ -42,82 +42,58 @@ public static class SeedData
             {
                 new LocationCategory
                 {
-                    Name = "Кафе и рестораны",
-                    IconName = "cafe",
-                    Description = "Кафе, рестораны, пиццерии",
+                    Name = "Кино",
+                    IconName = "movie",
+                    Description = "Кинотеатры и кино",
                     DisplayOrder = 1,
                     IsActive = true
                 },
                 new LocationCategory
                 {
-                    Name = "Развлечения",
-                    IconName = "entertainment",
-                    Description = "Кинотеатры, боулинг, караоке",
+                    Name = "Концерты",
+                    IconName = "concerts",
+                    Description = "Концерты и музыкальные мероприятия",
                     DisplayOrder = 2,
                     IsActive = true
                 },
                 new LocationCategory
                 {
-                    Name = "Учеба",
-                    IconName = "education",
-                    Description = "Библиотеки, коворкинги, учебные центры",
+                    Name = "Театры",
+                    IconName = "theatre",
+                    Description = "Театральные постановки и спектакли",
                     DisplayOrder = 3,
                     IsActive = true
                 },
                 new LocationCategory
                 {
-                    Name = "Спорт",
-                    IconName = "sport",
-                    Description = "Спортзалы, стадионы, спортивные площадки",
+                    Name = "Музеи",
+                    IconName = "museums",
+                    Description = "Музеи и выставки",
                     DisplayOrder = 4,
                     IsActive = true
                 },
                 new LocationCategory
                 {
-                    Name = "Отдых",
-                    IconName = "relax",
-                    Description = "Парки, скверы, места для отдыха",
+                    Name = "Памятники",
+                    IconName = "landmark",
+                    Description = "Памятники и исторические места",
                     DisplayOrder = 5,
                     IsActive = true
                 },
                 new LocationCategory
                 {
-                    Name = "Торговля",
-                    IconName = "shopping",
-                    Description = "Магазины, торговые центры",
+                    Name = "Загородный отдых",
+                    IconName = "suburban",
+                    Description = "Места для загородного отдыха",
                     DisplayOrder = 6,
                     IsActive = true
                 },
                 new LocationCategory
                 {
-                    Name = "Ночная жизнь",
-                    IconName = "nightlife",
-                    Description = "Клубы, бары, ночные заведения",
+                    Name = "Туристические маршруты",
+                    IconName = "tourist",
+                    Description = "Туристические маршруты и экскурсии",
                     DisplayOrder = 7,
-                    IsActive = true
-                },
-                new LocationCategory
-                {
-                    Name = "Культура",
-                    IconName = "culture",
-                    Description = "Музеи, театры, галереи",
-                    DisplayOrder = 8,
-                    IsActive = true
-                },
-                new LocationCategory
-                {
-                    Name = "Общественный транспорт",
-                    IconName = "transport",
-                    Description = "Остановки, станции метро",
-                    DisplayOrder = 9,
-                    IsActive = true
-                },
-                new LocationCategory
-                {
-                    Name = "Услуги",
-                    IconName = "services",
-                    Description = "Банки, почта, салоны",
-                    DisplayOrder = 10,
                     IsActive = true
                 }
             };
@@ -126,85 +102,58 @@ public static class SeedData
             await context.SaveChangesAsync();
         }
         
-        // Seed test locations
-        if (!context.Locations.Any())
+        // Seed location subcategories
+        if (!context.LocationSubcategories.Any())
         {
-            var locations = new List<Location>
+            var subcategories = new List<LocationSubcategory>();
+            
+            // Театры subcategories
+            var theatreCategory = await context.LocationCategories.FirstAsync(c => c.Name == "Театры");
+            subcategories.AddRange(new[]
             {
-                new Location
-                {
-                    Name = "Кафе Центр",
-                    Description = "Уютное кафе в центре города с отличным кофе",
-                    Coordinates = "55.7558,37.6176",
-                    Address = "ул. Тверская, 1",
-                    City = "Москва",
-                    Phone = "+7 (495) 123-45-67",
-                    Website = "https://cafe-center.ru",
-                    ImageUrl = "https://example.com/cafe-center.jpg",
-                    Rating = 4.5m,
-                    RatingCount = 120,
-                    PriceRange = "$$",
-                    WorkingHours = "09:00-22:00",
-                    IsActive = true,
-                    IsVerified = true
-                },
-                new Location
-                {
-                    Name = "Библиотека им. Ленина",
-                    Description = "Главная библиотека города с большим выбором книг",
-                    Coordinates = "55.7522,37.6156",
-                    Address = "ул. Воздвиженка, 3/5",
-                    City = "Москва",
-                    Phone = "+7 (495) 202-57-90",
-                    Website = "https://leninka.ru",
-                    ImageUrl = "https://example.com/library.jpg",
-                    Rating = 4.8m,
-                    RatingCount = 89,
-                    PriceRange = "Free",
-                    WorkingHours = "09:00-21:00",
-                    IsActive = true,
-                    IsVerified = true
-                },
-                new Location
-                {
-                    Name = "Спорткомплекс Олимпийский",
-                    Description = "Современный спортивный комплекс с бассейном и тренажерным залом",
-                    Coordinates = "55.7896,37.6218",
-                    Address = "Олимпийский проспект, 16",
-                    City = "Москва",
-                    Phone = "+7 (495) 234-56-78",
-                    Website = "https://olympic-sport.ru",
-                    ImageUrl = "https://example.com/sport.jpg",
-                    Rating = 4.2m,
-                    RatingCount = 156,
-                    PriceRange = "$$$",
-                    WorkingHours = "06:00-24:00",
-                    IsActive = true,
-                    IsVerified = true
-                }
-            };
+                new LocationSubcategory { Name = "Драма", CategoryId = theatreCategory.Id, DisplayOrder = 1, IsActive = true },
+                new LocationSubcategory { Name = "Комедия", CategoryId = theatreCategory.Id, DisplayOrder = 2, IsActive = true },
+                new LocationSubcategory { Name = "Мюзикл", CategoryId = theatreCategory.Id, DisplayOrder = 3, IsActive = true },
+                new LocationSubcategory { Name = "Детские спектакли", CategoryId = theatreCategory.Id, DisplayOrder = 4, IsActive = true },
+                new LocationSubcategory { Name = "Современное искусство", CategoryId = theatreCategory.Id, DisplayOrder = 5, IsActive = true },
+                new LocationSubcategory { Name = "Классика", CategoryId = theatreCategory.Id, DisplayOrder = 6, IsActive = true }
+            });
             
-            context.Locations.AddRange(locations);
-            await context.SaveChangesAsync();
-            
-            // Add category associations
-            var cafeCategory = await context.LocationCategories.FirstAsync(c => c.Name == "Кафе и рестораны");
-            var educationCategory = await context.LocationCategories.FirstAsync(c => c.Name == "Учеба");
-            var sportCategory = await context.LocationCategories.FirstAsync(c => c.Name == "Спорт");
-            
-            var cafeLocation = await context.Locations.FirstAsync(l => l.Name == "Кафе Центр");
-            var libraryLocation = await context.Locations.FirstAsync(l => l.Name == "Библиотека им. Ленина");
-            var sportLocation = await context.Locations.FirstAsync(l => l.Name == "Спорткомплекс Олимпийский");
-            
-            var categoryJoins = new List<LocationCategoryJoin>
+            // Кино subcategories
+            var movieCategory = await context.LocationCategories.FirstAsync(c => c.Name == "Кино");
+            subcategories.AddRange(new[]
             {
-                new LocationCategoryJoin { LocationId = cafeLocation.Id, CategoryId = cafeCategory.Id },
-                new LocationCategoryJoin { LocationId = libraryLocation.Id, CategoryId = educationCategory.Id },
-                new LocationCategoryJoin { LocationId = sportLocation.Id, CategoryId = sportCategory.Id }
-            };
+                new LocationSubcategory { Name = "Драма", CategoryId = movieCategory.Id, DisplayOrder = 1, IsActive = true },
+                new LocationSubcategory { Name = "Комедия", CategoryId = movieCategory.Id, DisplayOrder = 2, IsActive = true },
+                new LocationSubcategory { Name = "Боевик", CategoryId = movieCategory.Id, DisplayOrder = 3, IsActive = true },
+                new LocationSubcategory { Name = "Ужасы", CategoryId = movieCategory.Id, DisplayOrder = 4, IsActive = true },
+                new LocationSubcategory { Name = "Фантастика", CategoryId = movieCategory.Id, DisplayOrder = 5, IsActive = true },
+                new LocationSubcategory { Name = "Мелодрама", CategoryId = movieCategory.Id, DisplayOrder = 6, IsActive = true },
+                new LocationSubcategory { Name = "Детектив", CategoryId = movieCategory.Id, DisplayOrder = 7, IsActive = true },
+                new LocationSubcategory { Name = "Арт-хаус", CategoryId = movieCategory.Id, DisplayOrder = 8, IsActive = true }
+            });
             
-            context.LocationCategoryJoins.AddRange(categoryJoins);
+            // Концерты subcategories
+            var concertsCategory = await context.LocationCategories.FirstAsync(c => c.Name == "Концерты");
+            subcategories.AddRange(new[]
+            {
+                new LocationSubcategory { Name = "Рок", CategoryId = concertsCategory.Id, DisplayOrder = 1, IsActive = true },
+                new LocationSubcategory { Name = "Поп", CategoryId = concertsCategory.Id, DisplayOrder = 2, IsActive = true },
+                new LocationSubcategory { Name = "Джаз", CategoryId = concertsCategory.Id, DisplayOrder = 3, IsActive = true },
+                new LocationSubcategory { Name = "Электронная музыка", CategoryId = concertsCategory.Id, DisplayOrder = 4, IsActive = true },
+                new LocationSubcategory { Name = "Классика", CategoryId = concertsCategory.Id, DisplayOrder = 5, IsActive = true },
+                new LocationSubcategory { Name = "Инди", CategoryId = concertsCategory.Id, DisplayOrder = 6, IsActive = true },
+                new LocationSubcategory { Name = "Альтернатива", CategoryId = concertsCategory.Id, DisplayOrder = 7, IsActive = true }
+            });
+            
+            context.LocationSubcategories.AddRange(subcategories);
             await context.SaveChangesAsync();
         }
+        
+        // Seed test locations (optional - можно удалить или оставить для тестов)
+        // if (!context.Locations.Any())
+        // {
+        //     // Примеры локаций можно добавить здесь
+        // }
     }
 }

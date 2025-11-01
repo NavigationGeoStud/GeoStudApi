@@ -257,3 +257,4 @@ yarn-debug.log*
 yarn-error.log*
 GeoStudLocal.db-shm
 GeoStudLocal.db-shm
+GeoStudLocal.db-wal

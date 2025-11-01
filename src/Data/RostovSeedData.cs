@@ -10,6 +10,22 @@ public static class RostovSeedData
         // Seed Rostov locations for each category
         if (!context.Locations.Any(l => l.City == "Ростов-на-Дону"))
         {
+            // Get categories first
+            var categories = await context.LocationCategories.ToListAsync();
+            var cafeCategory = categories.FirstOrDefault(c => c.Name == "Кафе и рестораны");
+            var entertainmentCategory = categories.FirstOrDefault(c => c.Name == "Развлечения");
+            var educationCategory = categories.FirstOrDefault(c => c.Name == "Учеба");
+            var sportCategory = categories.FirstOrDefault(c => c.Name == "Спорт");
+            var relaxCategory = categories.FirstOrDefault(c => c.Name == "Отдых");
+            var shoppingCategory = categories.FirstOrDefault(c => c.Name == "Торговля");
+            var nightlifeCategory = categories.FirstOrDefault(c => c.Name == "Ночная жизнь");
+            var cultureCategory = categories.FirstOrDefault(c => c.Name == "Культура");
+            var transportCategory = categories.FirstOrDefault(c => c.Name == "Общественный транспорт");
+            var servicesCategory = categories.FirstOrDefault(c => c.Name == "Услуги");
+            
+            // Use first category as fallback if specific category not found
+            var defaultCategoryId = categories.FirstOrDefault()?.Id ?? 1;
+            
             var rostovLocations = new List<Location>
             {
                 // Кафе и рестораны
@@ -883,177 +899,80 @@ public static class RostovSeedData
                 }
             };
 
+            // Set CategoryId for each location based on their group
+            foreach (var location in rostovLocations)
+            {
+                // Determine category based on location name patterns
+                if (location.Name.Contains("Ресторан") || location.Name.Contains("Кафе") || 
+                    location.Name.Contains("Пиццерия") || location.Name.Contains("Булочная"))
+                {
+                    location.CategoryId = cafeCategory?.Id ?? defaultCategoryId;
+                }
+                else if (location.Name.Contains("Кинотеатр") || location.Name.Contains("Боулинг") || 
+                         location.Name.Contains("Караоке") || location.Name.Contains("Развлекательный") || 
+                         location.Name.Contains("Бильярдный"))
+                {
+                    location.CategoryId = entertainmentCategory?.Id ?? defaultCategoryId;
+                }
+                else if (location.Name.Contains("Библиотека") || location.Name.Contains("Коворкинг") || 
+                         location.Name.Contains("Учебный") || location.Name.Contains("Центр изучения"))
+                {
+                    location.CategoryId = educationCategory?.Id ?? defaultCategoryId;
+                }
+                else if (location.Name.Contains("Спорткомплекс") || location.Name.Contains("Фитнес") || 
+                         location.Name.Contains("Стадион") || location.Name.Contains("Теннисный") || 
+                         location.Name.Contains("Спортивная"))
+                {
+                    location.CategoryId = sportCategory?.Id ?? defaultCategoryId;
+                }
+                else if (location.Name.Contains("Парк") || location.Name.Contains("Набережная") || 
+                         location.Name.Contains("Сквер") || location.Name.Contains("Ботанический") || 
+                         location.Name.Contains("Пляж"))
+                {
+                    location.CategoryId = relaxCategory?.Id ?? defaultCategoryId;
+                }
+                else if (location.Name.Contains("ТРЦ") || location.Name.Contains("ТЦ") || 
+                         location.Name.Contains("Рынок") || location.Name.Contains("Магазин"))
+                {
+                    location.CategoryId = shoppingCategory?.Id ?? defaultCategoryId;
+                }
+                else if (location.Name.Contains("Клуб") || location.Name.Contains("Бар"))
+                {
+                    location.CategoryId = nightlifeCategory?.Id ?? defaultCategoryId;
+                }
+                else if (location.Name.Contains("Музей") || location.Name.Contains("Театр") || 
+                         location.Name.Contains("Галерея") || location.Name.Contains("Концертный"))
+                {
+                    location.CategoryId = cultureCategory?.Id ?? defaultCategoryId;
+                }
+                else if (location.Name.Contains("Вокзал") || location.Name.Contains("Остановка") || 
+                         location.Name.Contains("Станция") || location.Name.Contains("Такси"))
+                {
+                    location.CategoryId = transportCategory?.Id ?? defaultCategoryId;
+                }
+                else if (location.Name.Contains("Сбербанк") || location.Name.Contains("Почта") || 
+                         location.Name.Contains("Салон") || location.Name.Contains("Медицинский") || 
+                         location.Name.Contains("Аптека"))
+                {
+                    location.CategoryId = servicesCategory?.Id ?? defaultCategoryId;
+                }
+                else
+                {
+                    // Default to first category if no pattern matches
+                    location.CategoryId = defaultCategoryId;
+                }
+            }
+
             context.Locations.AddRange(rostovLocations);
             await context.SaveChangesAsync();
-
-            // Add category associations for Rostov locations
-            await AddRostovCategoryAssociations(context);
         }
     }
 
+    // This method is no longer needed as CategoryId is set during location creation
+    // Keeping it empty for backward compatibility
     private static async Task AddRostovCategoryAssociations(GeoStudDbContext context)
     {
-        var categories = await context.LocationCategories.ToListAsync();
-        var rostovLocations = await context.Locations
-            .Where(l => l.City == "Ростов-на-Дону")
-            .ToListAsync();
-
-        var categoryJoins = new List<LocationCategoryJoin>();
-
-        // Кафе и рестораны (5 locations)
-        var cafeCategory = categories.First(c => c.Name == "Кафе и рестораны");
-        var cafeLocations = rostovLocations.Where(l => 
-            l.Name.Contains("Ресторан") || l.Name.Contains("Кафе") || 
-            l.Name.Contains("Пиццерия") || l.Name.Contains("Булочная")).Take(5);
-        
-        foreach (var location in cafeLocations)
-        {
-            categoryJoins.Add(new LocationCategoryJoin 
-            { 
-                LocationId = location.Id, 
-                CategoryId = cafeCategory.Id 
-            });
-        }
-
-        // Развлечения (5 locations)
-        var entertainmentCategory = categories.First(c => c.Name == "Развлечения");
-        var entertainmentLocations = rostovLocations.Where(l => 
-            l.Name.Contains("Кинотеатр") || l.Name.Contains("Боулинг") || 
-            l.Name.Contains("Караоке") || l.Name.Contains("Развлекательный") || 
-            l.Name.Contains("Бильярдный")).Take(5);
-        
-        foreach (var location in entertainmentLocations)
-        {
-            categoryJoins.Add(new LocationCategoryJoin 
-            { 
-                LocationId = location.Id, 
-                CategoryId = entertainmentCategory.Id 
-            });
-        }
-
-        // Учеба (5 locations)
-        var educationCategory = categories.First(c => c.Name == "Учеба");
-        var educationLocations = rostovLocations.Where(l => 
-            l.Name.Contains("Библиотека") || l.Name.Contains("Коворкинг") || 
-            l.Name.Contains("Учебный") || l.Name.Contains("Центр изучения")).Take(5);
-        
-        foreach (var location in educationLocations)
-        {
-            categoryJoins.Add(new LocationCategoryJoin 
-            { 
-                LocationId = location.Id, 
-                CategoryId = educationCategory.Id 
-            });
-        }
-
-        // Спорт (5 locations)
-        var sportCategory = categories.First(c => c.Name == "Спорт");
-        var sportLocations = rostovLocations.Where(l => 
-            l.Name.Contains("Спорткомплекс") || l.Name.Contains("Фитнес") || 
-            l.Name.Contains("Стадион") || l.Name.Contains("Теннисный") || 
-            l.Name.Contains("Спортивная")).Take(5);
-        
-        foreach (var location in sportLocations)
-        {
-            categoryJoins.Add(new LocationCategoryJoin 
-            { 
-                LocationId = location.Id, 
-                CategoryId = sportCategory.Id 
-            });
-        }
-
-        // Отдых (5 locations)
-        var relaxCategory = categories.First(c => c.Name == "Отдых");
-        var relaxLocations = rostovLocations.Where(l => 
-            l.Name.Contains("Парк") || l.Name.Contains("Набережная") || 
-            l.Name.Contains("Сквер") || l.Name.Contains("Ботанический") || 
-            l.Name.Contains("Пляж")).Take(5);
-        
-        foreach (var location in relaxLocations)
-        {
-            categoryJoins.Add(new LocationCategoryJoin 
-            { 
-                LocationId = location.Id, 
-                CategoryId = relaxCategory.Id 
-            });
-        }
-
-        // Торговля (5 locations)
-        var shoppingCategory = categories.First(c => c.Name == "Торговля");
-        var shoppingLocations = rostovLocations.Where(l => 
-            l.Name.Contains("ТРЦ") || l.Name.Contains("ТЦ") || 
-            l.Name.Contains("Рынок") || l.Name.Contains("Магазин")).Take(5);
-        
-        foreach (var location in shoppingLocations)
-        {
-            categoryJoins.Add(new LocationCategoryJoin 
-            { 
-                LocationId = location.Id, 
-                CategoryId = shoppingCategory.Id 
-            });
-        }
-
-        // Ночная жизнь (5 locations)
-        var nightlifeCategory = categories.First(c => c.Name == "Ночная жизнь");
-        var nightlifeLocations = rostovLocations.Where(l => 
-            l.Name.Contains("Клуб") || l.Name.Contains("Бар")).Take(5);
-        
-        foreach (var location in nightlifeLocations)
-        {
-            categoryJoins.Add(new LocationCategoryJoin 
-            { 
-                LocationId = location.Id, 
-                CategoryId = nightlifeCategory.Id 
-            });
-        }
-
-        // Культура (5 locations)
-        var cultureCategory = categories.First(c => c.Name == "Культура");
-        var cultureLocations = rostovLocations.Where(l => 
-            l.Name.Contains("Музей") || l.Name.Contains("Театр") || 
-            l.Name.Contains("Галерея") || l.Name.Contains("Концертный")).Take(5);
-        
-        foreach (var location in cultureLocations)
-        {
-            categoryJoins.Add(new LocationCategoryJoin 
-            { 
-                LocationId = location.Id, 
-                CategoryId = cultureCategory.Id 
-            });
-        }
-
-        // Общественный транспорт (5 locations)
-        var transportCategory = categories.First(c => c.Name == "Общественный транспорт");
-        var transportLocations = rostovLocations.Where(l => 
-            l.Name.Contains("Вокзал") || l.Name.Contains("Остановка") || 
-            l.Name.Contains("Станция") || l.Name.Contains("Такси")).Take(5);
-        
-        foreach (var location in transportLocations)
-        {
-            categoryJoins.Add(new LocationCategoryJoin 
-            { 
-                LocationId = location.Id, 
-                CategoryId = transportCategory.Id 
-            });
-        }
-
-        // Услуги (5 locations)
-        var servicesCategory = categories.First(c => c.Name == "Услуги");
-        var servicesLocations = rostovLocations.Where(l => 
-            l.Name.Contains("Сбербанк") || l.Name.Contains("Почта") || 
-            l.Name.Contains("Салон") || l.Name.Contains("Медицинский") || 
-            l.Name.Contains("Аптека")).Take(5);
-        
-        foreach (var location in servicesLocations)
-        {
-            categoryJoins.Add(new LocationCategoryJoin 
-            { 
-                LocationId = location.Id, 
-                CategoryId = servicesCategory.Id 
-            });
-        }
-
-        context.LocationCategoryJoins.AddRange(categoryJoins);
-        await context.SaveChangesAsync();
+        // CategoryId is now set during location creation in SeedRostovLocationsAsync
+        await Task.CompletedTask;
     }
 }

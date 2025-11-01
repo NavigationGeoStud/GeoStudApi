@@ -16,11 +16,13 @@ public class GeoStudDbContext : DbContext
     public DbSet<Student> Students { get; set; }
     public DbSet<StudentResponse> StudentResponses { get; set; }
     public DbSet<AnalyticsData> AnalyticsData { get; set; }
+    public DbSet<FavoriteLocation> FavoriteLocations { get; set; }
     
     // Location entities
     public DbSet<Location> Locations { get; set; }
     public DbSet<LocationCategory> LocationCategories { get; set; }
-    public DbSet<LocationCategoryJoin> LocationCategoryJoins { get; set; }
+    public DbSet<LocationSubcategory> LocationSubcategories { get; set; }
+    public DbSet<LocationSubcategoryJoin> LocationSubcategoryJoins { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -39,6 +41,7 @@ public class GeoStudDbContext : DbContext
         {
             entity.HasIndex(e => e.Username).IsUnique();
             entity.HasIndex(e => e.Email).IsUnique();
+            entity.HasIndex(e => e.TelegramId).IsUnique();
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
             entity.HasIndex(e => e.AgeRange);
             entity.HasIndex(e => e.Gender);
@@ -73,6 +76,7 @@ public class GeoStudDbContext : DbContext
             entity.HasIndex(e => e.City);
             entity.HasIndex(e => e.IsActive);
             entity.HasIndex(e => e.IsVerified);
+            entity.HasIndex(e => e.CategoryId);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
         });
 
@@ -83,20 +87,53 @@ public class GeoStudDbContext : DbContext
             entity.HasIndex(e => e.DisplayOrder);
             entity.HasIndex(e => e.IsActive);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.HasMany(e => e.Locations)
+                .WithOne(l => l.Category)
+                .HasForeignKey(l => l.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // LocationCategoryJoin configuration (many-to-many)
-        modelBuilder.Entity<LocationCategoryJoin>(entity =>
+        // LocationSubcategory configuration
+        modelBuilder.Entity<LocationSubcategory>(entity =>
         {
-            entity.HasKey(e => new { e.LocationId, e.CategoryId });
+            entity.HasIndex(e => new { e.CategoryId, e.Name }).IsUnique();
+            entity.HasIndex(e => e.DisplayOrder);
+            entity.HasIndex(e => e.IsActive);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.HasOne(e => e.Category)
+                .WithMany(c => c.Subcategories)
+                .HasForeignKey(e => e.CategoryId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // LocationSubcategoryJoin configuration (many-to-many)
+        modelBuilder.Entity<LocationSubcategoryJoin>(entity =>
+        {
+            entity.HasKey(e => new { e.LocationId, e.SubcategoryId });
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
             entity.HasOne(e => e.Location)
-                .WithMany(l => l.CategoryJoins)
+                .WithMany(l => l.SubcategoryJoins)
                 .HasForeignKey(e => e.LocationId)
                 .OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne(e => e.Category)
-                .WithMany(c => c.LocationJoins)
-                .HasForeignKey(e => e.CategoryId)
+            entity.HasOne(e => e.Subcategory)
+                .WithMany(s => s.LocationJoins)
+                .HasForeignKey(e => e.SubcategoryId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // FavoriteLocation configuration
+        modelBuilder.Entity<FavoriteLocation>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.StudentId, e.LocationId }).IsUnique();
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.HasOne(e => e.Student)
+                .WithMany(s => s.FavoriteLocations)
+                .HasForeignKey(e => e.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Location)
+                .WithMany(l => l.FavoriteLocations)
+                .HasForeignKey(e => e.LocationId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -105,9 +142,11 @@ public class GeoStudDbContext : DbContext
         modelBuilder.Entity<Student>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<StudentResponse>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<AnalyticsData>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<FavoriteLocation>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<Location>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<LocationCategory>().HasQueryFilter(e => !e.IsDeleted);
-        modelBuilder.Entity<LocationCategoryJoin>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<LocationSubcategory>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<LocationSubcategoryJoin>().HasQueryFilter(e => !e.IsDeleted);
     }
 
     public override int SaveChanges()

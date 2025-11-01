@@ -3,6 +3,7 @@ using System;
 using GeoStud.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GeoStud.Api.Migrations
 {
     [DbContext(typeof(GeoStudDbContext))]
-    partial class GeoStudDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251031180337_AddLocationSubcategory")]
+    partial class AddLocationSubcategory
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.0");
@@ -71,43 +74,6 @@ namespace GeoStud.Api.Migrations
                     b.ToTable("AnalyticsData");
                 });
 
-            modelBuilder.Entity("GeoStud.Api.Models.FavoriteLocation", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
-                        .HasDefaultValueSql("GETUTCDATE()");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("LocationId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(500)
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("StudentId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("LocationId");
-
-                    b.HasIndex("StudentId", "LocationId")
-                        .IsUnique();
-
-                    b.ToTable("FavoriteLocations");
-                });
-
             modelBuilder.Entity("GeoStud.Api.Models.Location", b =>
                 {
                     b.Property<int>("Id")
@@ -117,9 +83,6 @@ namespace GeoStud.Api.Migrations
                     b.Property<string>("Address")
                         .HasMaxLength(255)
                         .HasColumnType("TEXT");
-
-                    b.Property<int>("CategoryId")
-                        .HasColumnType("INTEGER");
 
                     b.Property<string>("City")
                         .HasMaxLength(100)
@@ -184,8 +147,6 @@ namespace GeoStud.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CategoryId");
-
                     b.HasIndex("City");
 
                     b.HasIndex("Coordinates");
@@ -247,6 +208,35 @@ namespace GeoStud.Api.Migrations
                     b.ToTable("LocationCategories");
                 });
 
+            modelBuilder.Entity("GeoStud.Api.Models.LocationCategoryJoin", b =>
+                {
+                    b.Property<int>("LocationId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("CategoryId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<int>("Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("LocationId", "CategoryId");
+
+                    b.HasIndex("CategoryId");
+
+                    b.ToTable("LocationCategoryJoins");
+                });
+
             modelBuilder.Entity("GeoStud.Api.Models.LocationSubcategory", b =>
                 {
                     b.Property<int>("Id")
@@ -292,35 +282,6 @@ namespace GeoStud.Api.Migrations
                         .IsUnique();
 
                     b.ToTable("LocationSubcategories");
-                });
-
-            modelBuilder.Entity("GeoStud.Api.Models.LocationSubcategoryJoin", b =>
-                {
-                    b.Property<int>("LocationId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("SubcategoryId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
-                        .HasDefaultValueSql("GETUTCDATE()");
-
-                    b.Property<int>("Id")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("LocationId", "SubcategoryId");
-
-                    b.HasIndex("SubcategoryId");
-
-                    b.ToTable("LocationSubcategoryJoins");
                 });
 
             modelBuilder.Entity("GeoStud.Api.Models.ServiceClient", b =>
@@ -527,34 +488,23 @@ namespace GeoStud.Api.Migrations
                     b.ToTable("StudentResponses");
                 });
 
-            modelBuilder.Entity("GeoStud.Api.Models.FavoriteLocation", b =>
+            modelBuilder.Entity("GeoStud.Api.Models.LocationCategoryJoin", b =>
                 {
+                    b.HasOne("GeoStud.Api.Models.LocationCategory", "Category")
+                        .WithMany("LocationJoins")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("GeoStud.Api.Models.Location", "Location")
-                        .WithMany("FavoriteLocations")
+                        .WithMany("CategoryJoins")
                         .HasForeignKey("LocationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("GeoStud.Api.Models.Student", "Student")
-                        .WithMany("FavoriteLocations")
-                        .HasForeignKey("StudentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.Navigation("Category");
 
                     b.Navigation("Location");
-
-                    b.Navigation("Student");
-                });
-
-            modelBuilder.Entity("GeoStud.Api.Models.Location", b =>
-                {
-                    b.HasOne("GeoStud.Api.Models.LocationCategory", "Category")
-                        .WithMany("Locations")
-                        .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Category");
                 });
 
             modelBuilder.Entity("GeoStud.Api.Models.LocationSubcategory", b =>
@@ -566,25 +516,6 @@ namespace GeoStud.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Category");
-                });
-
-            modelBuilder.Entity("GeoStud.Api.Models.LocationSubcategoryJoin", b =>
-                {
-                    b.HasOne("GeoStud.Api.Models.Location", "Location")
-                        .WithMany("SubcategoryJoins")
-                        .HasForeignKey("LocationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("GeoStud.Api.Models.LocationSubcategory", "Subcategory")
-                        .WithMany("LocationJoins")
-                        .HasForeignKey("SubcategoryId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Location");
-
-                    b.Navigation("Subcategory");
                 });
 
             modelBuilder.Entity("GeoStud.Api.Models.StudentResponse", b =>
@@ -600,27 +531,18 @@ namespace GeoStud.Api.Migrations
 
             modelBuilder.Entity("GeoStud.Api.Models.Location", b =>
                 {
-                    b.Navigation("FavoriteLocations");
-
-                    b.Navigation("SubcategoryJoins");
+                    b.Navigation("CategoryJoins");
                 });
 
             modelBuilder.Entity("GeoStud.Api.Models.LocationCategory", b =>
                 {
-                    b.Navigation("Locations");
+                    b.Navigation("LocationJoins");
 
                     b.Navigation("Subcategories");
                 });
 
-            modelBuilder.Entity("GeoStud.Api.Models.LocationSubcategory", b =>
-                {
-                    b.Navigation("LocationJoins");
-                });
-
             modelBuilder.Entity("GeoStud.Api.Models.Student", b =>
                 {
-                    b.Navigation("FavoriteLocations");
-
                     b.Navigation("Responses");
                 });
 #pragma warning restore 612, 618

@@ -57,6 +57,7 @@ public class SurveyController : ControllerBase
             if (existingStudent != null)
             {
                 // Update existing student
+                existingStudent.TelegramId = request.TelegramId;
                 existingStudent.AgeRange = request.AgeRange;
                 existingStudent.IsStudent = request.IsStudent;
                 existingStudent.Gender = request.Gender;
@@ -77,6 +78,7 @@ public class SurveyController : ControllerBase
                     Username = username,
                     Email = $"{clientIdClaim}@service.local",
                     PasswordHash = "service_user", // Not used for service users
+                    TelegramId = request.TelegramId,
                     AgeRange = request.AgeRange,
                     IsStudent = request.IsStudent,
                     Gender = request.Gender,
@@ -99,6 +101,7 @@ public class SurveyController : ControllerBase
             var response = new SurveyResponse
             {
                 StudentId = student.Id,
+                TelegramId = student.TelegramId,
                 Username = student.Username,
                 Email = student.Email,
                 AgeRange = student.AgeRange,
@@ -149,6 +152,7 @@ public class SurveyController : ControllerBase
             var response = new SurveyResponse
             {
                 StudentId = student.Id,
+                TelegramId = student.TelegramId,
                 Username = student.Username,
                 Email = student.Email,
                 AgeRange = student.AgeRange,
@@ -190,6 +194,7 @@ public class SurveyController : ControllerBase
             var responses = students.Select(s => new SurveyResponse
             {
                 StudentId = s.Id,
+                TelegramId = s.TelegramId,
                 Username = s.Username,
                 Email = s.Email,
                 AgeRange = s.AgeRange,
