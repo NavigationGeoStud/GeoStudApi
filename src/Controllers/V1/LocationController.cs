@@ -406,8 +406,6 @@ public class LocationController : ControllerBase
                 return BadRequest(new { error = "Invalid coordinates format. Expected format: 'latitude,longitude'" });
             }
 
-            // Note: This is a simplified implementation
-            // For production, consider using SQL spatial queries or a proper geospatial library
             var locations = await _context.Locations
                 .Include(l => l.CategoryJoins)
                     .ThenInclude(cj => cj.Category)
@@ -471,7 +469,6 @@ public class LocationController : ControllerBase
 
     private static double CalculateDistance(decimal lat1, decimal lng1, decimal lat2, decimal lng2)
     {
-        // Haversine formula for calculating distance between two points
         const double earthRadiusKm = 6371.0;
 
         var dLat = ToRadians((double)(lat2 - lat1));

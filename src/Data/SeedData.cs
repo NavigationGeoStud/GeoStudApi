@@ -7,7 +7,6 @@ public static class SeedData
 {
     public static async Task SeedAsync(GeoStudDbContext context)
     {
-        // Seed service clients
         if (!context.ServiceClients.Any())
         {
             var serviceClients = new List<ServiceClient>
