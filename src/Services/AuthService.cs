@@ -7,6 +7,7 @@ using System.Text;
 using GeoStud.Api.Data;
 using GeoStud.Api.DTOs.Auth;
 using GeoStud.Api.Models;
+using GeoStud.Api.Services.Interfaces;
 
 namespace GeoStud.Api.Services;
 

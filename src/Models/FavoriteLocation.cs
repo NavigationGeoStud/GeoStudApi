@@ -6,7 +6,7 @@ namespace GeoStud.Api.Models;
 public class FavoriteLocation : BaseEntity
 {
     [Required]
-    public int StudentId { get; set; }
+    public int UserId { get; set; }
     
     [Required]
     public int LocationId { get; set; }
@@ -15,7 +15,7 @@ public class FavoriteLocation : BaseEntity
     public string? Notes { get; set; }
     
     // Navigation properties
-    public virtual Student Student { get; set; } = null!;
+    public virtual User User { get; set; } = null!;
     public virtual Location Location { get; set; } = null!;
 }
 

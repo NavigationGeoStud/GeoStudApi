@@ -5,7 +5,7 @@ namespace GeoStud.Api.Examples;
 
 public static class TestDataGenerator
 {
-    public static List<Student> GenerateSampleStudents()
+    public static List<User> GenerateSampleUsers()
     {
         var random = new Random();
         var interests = new[]
@@ -20,27 +20,27 @@ public static class TestDataGenerator
         var activityTimes = new[] { "Morning", "Day", "Evening", "Night" };
         var socialPreferences = new[] { "Alone", "Couple", "Group", "Party" };
 
-        var students = new List<Student>();
+        var users = new List<User>();
 
         for (int i = 1; i <= 50; i++)
         {
-            var studentInterests = interests
+            var userInterests = interests
                 .OrderBy(x => random.Next())
                 .Take(random.Next(2, 5))
                 .ToList();
 
-            var student = new Student
+            var user = new User
             {
-                Username = $"student{i}",
-                Email = $"student{i}@example.com",
+                Username = $"user{i}",
+                Email = $"user{i}@example.com",
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword("password123"),
-                FirstName = $"Student{i}",
+                FirstName = $"User{i}",
                 LastName = "Test",
                 AgeRange = ageRanges[random.Next(ageRanges.Length)],
                 IsStudent = random.NextDouble() > 0.2, // 80% are students
                 Gender = genders[random.Next(genders.Length)],
                 IsLocal = random.NextDouble() > 0.3, // 70% are local
-                Interests = JsonSerializer.Serialize(studentInterests),
+                Interests = JsonSerializer.Serialize(userInterests),
                 Budget = budgets[random.Next(budgets.Length)],
                 ActivityTime = activityTimes[random.Next(activityTimes.Length)],
                 SocialPreference = socialPreferences[random.Next(socialPreferences.Length)],
@@ -48,62 +48,62 @@ public static class TestDataGenerator
                 CreatedAt = DateTime.UtcNow.AddDays(-random.Next(0, 30))
             };
 
-            students.Add(student);
+            users.Add(user);
         }
 
-        return students;
+        return users;
     }
 
     public static void PrintSampleData()
     {
         Console.WriteLine("=== Sample Test Data for GeoStud API ===\n");
 
-        var students = GenerateSampleStudents();
+        var users = GenerateSampleUsers();
 
-        Console.WriteLine($"Generated {students.Count} sample students\n");
+        Console.WriteLine($"Generated {users.Count} sample users\n");
 
         // Show age distribution
-        var ageDistribution = students.GroupBy(s => s.AgeRange)
+        var ageDistribution = users.GroupBy(s => s.AgeRange)
             .Select(g => new { Age = g.Key, Count = g.Count() })
             .OrderBy(x => x.Age);
 
         Console.WriteLine("Age Distribution:");
         foreach (var age in ageDistribution)
         {
-            Console.WriteLine($"  {age.Age}: {age.Count} students");
+            Console.WriteLine($"  {age.Age}: {age.Count} users");
         }
 
         // Show gender distribution
-        var genderDistribution = students.GroupBy(s => s.Gender)
+        var genderDistribution = users.GroupBy(s => s.Gender)
             .Select(g => new { Gender = g.Key, Count = g.Count() })
             .OrderBy(x => x.Gender);
 
         Console.WriteLine("\nGender Distribution:");
         foreach (var gender in genderDistribution)
         {
-            Console.WriteLine($"  {gender.Gender}: {gender.Count} students");
+            Console.WriteLine($"  {gender.Gender}: {gender.Count} users");
         }
 
         // Show student status
-        var studentStatus = students.GroupBy(s => s.IsStudent)
+        var studentStatus = users.GroupBy(s => s.IsStudent)
             .Select(g => new { Status = g.Key ? "Student" : "Non-Student", Count = g.Count() })
             .OrderBy(x => x.Status);
 
         Console.WriteLine("\nStudent Status:");
         foreach (var status in studentStatus)
         {
-            Console.WriteLine($"  {status.Status}: {status.Count} students");
+            Console.WriteLine($"  {status.Status}: {status.Count} users");
         }
 
         // Show top interests
         var allInterests = new Dictionary<string, int>();
-        foreach (var student in students)
+        foreach (var user in users)
         {
-            if (!string.IsNullOrEmpty(student.Interests))
+            if (!string.IsNullOrEmpty(user.Interests))
             {
                 try
                 {
-                    var interests = JsonSerializer.Deserialize<List<string>>(student.Interests);
+                    var interests = JsonSerializer.Deserialize<List<string>>(user.Interests);
                     if (interests != null)
                     {
                         foreach (var interest in interests)
@@ -129,7 +129,7 @@ public static class TestDataGenerator
         Console.WriteLine("\nTop 5 Interests:");
         foreach (var interest in topInterests)
         {
-            Console.WriteLine($"  {interest.Key}: {interest.Value} students");
+            Console.WriteLine($"  {interest.Key}: {interest.Value} users");
         }
 
         Console.WriteLine("\n=== Sample data generation completed ===");

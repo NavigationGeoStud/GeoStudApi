@@ -1,6 +1,6 @@
 using GeoStud.Api.DTOs.Auth;
 
-namespace GeoStud.Api.Services;
+namespace GeoStud.Api.Services.Interfaces;
 
 public interface IAuthService
 {
@@ -8,3 +8,4 @@ public interface IAuthService
     Task<bool> ValidateTokenAsync(string token);
     Task<string?> GetServiceClientIdFromTokenAsync(string token);
 }
+

@@ -3,13 +3,13 @@ using System.Text.Json;
 
 namespace GeoStud.Api.Examples;
 
-public class SurveyClient : IDisposable
+public class UserClient : IDisposable
 {
     private readonly HttpClient _httpClient;
     private readonly string _baseUrl;
     private string? _accessToken;
 
-    public SurveyClient(string baseUrl)
+    public UserClient(string baseUrl)
     {
         _baseUrl = baseUrl.TrimEnd('/');
         _httpClient = new HttpClient();
@@ -57,21 +57,21 @@ public class SurveyClient : IDisposable
     }
 
     /// <summary>
-    /// Отправить данные опроса
+    /// Отправить данные пользователя
     /// </summary>
-    public async Task<string?> SubmitSurveyAsync(SurveyRequestData surveyData)
+    public async Task<string?> SubmitUserAsync(UserRequestData userData)
     {
         try
         {
-            var json = JsonSerializer.Serialize(surveyData);
+            var json = JsonSerializer.Serialize(userData);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync($"{_baseUrl}/api/v1/survey/submit", content);
+            var response = await _httpClient.PostAsync($"{_baseUrl}/api/v1/user/submit", content);
             return await response.Content.ReadAsStringAsync();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Submit survey error: {ex.Message}");
+            Console.WriteLine($"Submit user error: {ex.Message}");
             return null;
         }
     }
@@ -111,18 +111,18 @@ public class SurveyClient : IDisposable
     }
 
     /// <summary>
-    /// Получить все опросы
+    /// Получить всех пользователей
     /// </summary>
-    public async Task<string?> GetAllSurveysAsync()
+    public async Task<string?> GetAllUsersAsync()
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_baseUrl}/api/v1/survey");
+            var response = await _httpClient.GetAsync($"{_baseUrl}/api/v1/user");
             return await response.Content.ReadAsStringAsync();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Get all surveys error: {ex.Message}");
+            Console.WriteLine($"Get all users error: {ex.Message}");
             return null;
         }
     }
@@ -141,7 +141,7 @@ public class SurveyClient : IDisposable
     }
 }
 
-public class SurveyRequestData
+public class UserRequestData
 {
     public string AgeRange { get; set; } = string.Empty;
     public bool IsStudent { get; set; }
@@ -154,17 +154,17 @@ public class SurveyRequestData
 }
 
 /// <summary>
-/// Пример использования Survey клиента
+/// Пример использования User клиента
 /// </summary>
-public static class SurveyClientExample
+public static class UserClientExample
 {
     public static async Task RunExample()
     {
         const string baseUrl = "https://localhost:5001";
         
-        using var client = new SurveyClient(baseUrl);
+        using var client = new UserClient(baseUrl);
 
-        Console.WriteLine("=== GeoStud Survey API Client Example ===\n");
+        Console.WriteLine("=== GeoStud User API Client Example ===\n");
 
         // Пример 1: Аутентификация сервиса
         Console.WriteLine("1. Service Authentication:");
@@ -173,9 +173,9 @@ public static class SurveyClientExample
 
         if (loginSuccess)
         {
-            // Пример 2: Отправка опроса
-            Console.WriteLine("2. Submitting Survey:");
-            var surveyData = new SurveyRequestData
+            // Пример 2: Отправка данных пользователя
+            Console.WriteLine("2. Submitting User:");
+            var userData = new UserRequestData
             {
                 AgeRange = "17-22",
                 IsStudent = true,
@@ -187,7 +187,7 @@ public static class SurveyClientExample
                 SocialPreference = "Group"
             };
 
-            var submitResult = await client.SubmitSurveyAsync(surveyData);
+            var submitResult = await client.SubmitUserAsync(userData);
             Console.WriteLine($"Submit result: {submitResult}\n");
 
             // Пример 3: Получение аналитики
@@ -200,10 +200,10 @@ public static class SurveyClientExample
             var demographics = await client.GetDemographicsAnalyticsAsync();
             Console.WriteLine($"Demographics: {demographics}\n");
 
-            // Пример 5: Все опросы
-            Console.WriteLine("5. Getting All Surveys:");
-            var allSurveys = await client.GetAllSurveysAsync();
-            Console.WriteLine($"All surveys: {allSurveys}\n");
+            // Пример 5: Все пользователи
+            Console.WriteLine("5. Getting All Users:");
+            var allUsers = await client.GetAllUsersAsync();
+            Console.WriteLine($"All users: {allUsers}\n");
         }
 
         Console.WriteLine("=== Example completed ===");

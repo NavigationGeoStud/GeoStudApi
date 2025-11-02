@@ -5,6 +5,7 @@ namespace GeoStud.Api.Controllers.V1;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
+[Tags("General")]
 public class HealthController : ControllerBase
 {
     private readonly ILogger<HealthController> _logger;
@@ -42,18 +43,18 @@ public class HealthController : ControllerBase
         return Ok(new
         {
             name = "GeoStud API",
-            description = "API for collecting student survey data and analytics",
+            description = "API for collecting user data and analytics",
             version = "1.0.0",
             endpoints = new
             {
                 authentication = "/api/v1/auth",
-                survey = "/api/v1/survey",
+                users = "/api/v1/user",
                 analytics = "/api/v1/analytics",
-                users = "/api/v1/user"
+                telegram = "/api/v1/telegram"
             },
             features = new[]
             {
-                "Student survey data collection",
+                "User data collection",
                 "Demographics analytics",
                 "Interests analysis",
                 "Behavior analytics",

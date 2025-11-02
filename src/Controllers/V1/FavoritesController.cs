@@ -1,9 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using GeoStud.Api.Data;
 using GeoStud.Api.DTOs.Location;
-using GeoStud.Api.Models;
+using GeoStud.Api.Services.Interfaces;
 
 namespace GeoStud.Api.Controllers.V1;
 
@@ -11,35 +9,20 @@ namespace GeoStud.Api.Controllers.V1;
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
 [Authorize]
+[Tags("Private")]
 public class FavoritesController : ControllerBase
 {
-    private readonly GeoStudDbContext _context;
+    private readonly IFavoritesService _favoritesService;
     private readonly ILogger<FavoritesController> _logger;
 
-    public FavoritesController(GeoStudDbContext context, ILogger<FavoritesController> logger)
+    public FavoritesController(IFavoritesService favoritesService, ILogger<FavoritesController> logger)
     {
-        _context = context;
+        _favoritesService = favoritesService;
         _logger = logger;
     }
 
-    private async Task<int?> GetStudentIdFromContext()
-    {
-        // Get service client ID from token
-        var clientIdClaim = User.FindFirst("client_id")?.Value;
-        if (string.IsNullOrEmpty(clientIdClaim))
-        {
-            return null;
-        }
-
-        var username = $"service_{clientIdClaim}";
-        var student = await _context.Students
-            .FirstOrDefaultAsync(s => s.Username == username);
-
-        return student?.Id;
-    }
-
     /// <summary>
-    /// Get all favorite locations for current student
+    /// Get all favorite locations for current user
     /// </summary>
     /// <returns>List of favorite locations</returns>
     [HttpGet]
@@ -49,35 +32,20 @@ public class FavoritesController : ControllerBase
     {
         try
         {
-            var studentId = await GetStudentIdFromContext();
-            if (studentId == null)
+            var clientIdClaim = User.FindFirst("client_id")?.Value;
+            if (string.IsNullOrEmpty(clientIdClaim))
             {
                 return Unauthorized("Invalid service token");
             }
 
-            var favorites = await _context.FavoriteLocations
-                .Include(f => f.Location)
-                .Where(f => f.StudentId == studentId && !f.IsDeleted)
-                .OrderByDescending(f => f.CreatedAt)
-                .ToListAsync();
-
-            var responses = favorites.Select(f => new FavoriteLocationResponse
+            var userId = await _favoritesService.GetUserIdFromClientIdAsync(clientIdClaim);
+            if (userId == null)
             {
-                Id = f.Id,
-                StudentId = f.StudentId,
-                LocationId = f.LocationId,
-                Notes = f.Notes,
-                CreatedAt = f.CreatedAt,
-                LocationName = f.Location.Name,
-                LocationDescription = f.Location.Description,
-                Coordinates = f.Location.Coordinates,
-                Address = f.Location.Address,
-                City = f.Location.City,
-                Rating = f.Location.Rating,
-                ImageUrl = f.Location.ImageUrl
-            }).ToList();
+                return Unauthorized("Invalid service token");
+            }
 
-            return Ok(responses);
+            var favorites = await _favoritesService.GetFavoritesAsync(userId.Value);
+            return Ok(favorites);
         }
         catch (Exception ex)
         {
@@ -105,58 +73,20 @@ public class FavoritesController : ControllerBase
                 return BadRequest(ModelState);
             }
 
-            var studentId = await GetStudentIdFromContext();
-            if (studentId == null)
+            var clientIdClaim = User.FindFirst("client_id")?.Value;
+            if (string.IsNullOrEmpty(clientIdClaim))
             {
                 return Unauthorized("Invalid service token");
             }
 
-            // Check if location exists
-            var location = await _context.Locations
-                .FirstOrDefaultAsync(l => l.Id == request.LocationId && !l.IsDeleted);
-
-            if (location == null)
+            var userId = await _favoritesService.GetUserIdFromClientIdAsync(clientIdClaim);
+            if (userId == null)
             {
-                return NotFound(new { error = "Location not found" });
+                return Unauthorized("Invalid service token");
             }
 
-            // Check if already in favorites
-            var existingFavorite = await _context.FavoriteLocations
-                .FirstOrDefaultAsync(f => f.StudentId == studentId && f.LocationId == request.LocationId && !f.IsDeleted);
-
-            if (existingFavorite != null)
-            {
-                return BadRequest(new { error = "Location is already in favorites" });
-            }
-
-            // Create favorite
-            var favorite = new FavoriteLocation
-            {
-                StudentId = studentId.Value,
-                LocationId = request.LocationId,
-                Notes = request.Notes
-            };
-
-            _context.FavoriteLocations.Add(favorite);
-            await _context.SaveChangesAsync();
-
-            var response = new FavoriteLocationResponse
-            {
-                Id = favorite.Id,
-                StudentId = favorite.StudentId,
-                LocationId = favorite.LocationId,
-                Notes = favorite.Notes,
-                CreatedAt = favorite.CreatedAt,
-                LocationName = location.Name,
-                LocationDescription = location.Description,
-                Coordinates = location.Coordinates,
-                Address = location.Address,
-                City = location.City,
-                Rating = location.Rating,
-                ImageUrl = location.ImageUrl
-            };
-
-            return CreatedAtAction(nameof(GetFavorite), new { id = favorite.Id }, response);
+            var response = await _favoritesService.AddFavoriteAsync(userId.Value, request);
+            return CreatedAtAction(nameof(GetFavorite), new { id = response.Id }, response);
         }
         catch (Exception ex)
         {
@@ -178,38 +108,24 @@ public class FavoritesController : ControllerBase
     {
         try
         {
-            var studentId = await GetStudentIdFromContext();
-            if (studentId == null)
+            var clientIdClaim = User.FindFirst("client_id")?.Value;
+            if (string.IsNullOrEmpty(clientIdClaim))
             {
                 return Unauthorized("Invalid service token");
             }
 
-            var favorite = await _context.FavoriteLocations
-                .Include(f => f.Location)
-                .FirstOrDefaultAsync(f => f.Id == id && f.StudentId == studentId && !f.IsDeleted);
+            var userId = await _favoritesService.GetUserIdFromClientIdAsync(clientIdClaim);
+            if (userId == null)
+            {
+                return Unauthorized("Invalid service token");
+            }
 
+            var favorite = await _favoritesService.GetFavoriteByIdAsync(userId.Value, id);
             if (favorite == null)
             {
                 return NotFound();
             }
-
-            var response = new FavoriteLocationResponse
-            {
-                Id = favorite.Id,
-                StudentId = favorite.StudentId,
-                LocationId = favorite.LocationId,
-                Notes = favorite.Notes,
-                CreatedAt = favorite.CreatedAt,
-                LocationName = favorite.Location.Name,
-                LocationDescription = favorite.Location.Description,
-                Coordinates = favorite.Location.Coordinates,
-                Address = favorite.Location.Address,
-                City = favorite.Location.City,
-                Rating = favorite.Location.Rating,
-                ImageUrl = favorite.Location.ImageUrl
-            };
-
-            return Ok(response);
+            return Ok(favorite);
         }
         catch (Exception ex)
         {
@@ -237,40 +153,19 @@ public class FavoritesController : ControllerBase
                 return BadRequest(ModelState);
             }
 
-            var studentId = await GetStudentIdFromContext();
-            if (studentId == null)
+            var clientIdClaim = User.FindFirst("client_id")?.Value;
+            if (string.IsNullOrEmpty(clientIdClaim))
             {
                 return Unauthorized("Invalid service token");
             }
 
-            var favorite = await _context.FavoriteLocations
-                .Include(f => f.Location)
-                .FirstOrDefaultAsync(f => f.Id == id && f.StudentId == studentId && !f.IsDeleted);
-
-            if (favorite == null)
+            var userId = await _favoritesService.GetUserIdFromClientIdAsync(clientIdClaim);
+            if (userId == null)
             {
-                return NotFound();
+                return Unauthorized("Invalid service token");
             }
 
-            favorite.Notes = request.Notes;
-            await _context.SaveChangesAsync();
-
-            var response = new FavoriteLocationResponse
-            {
-                Id = favorite.Id,
-                StudentId = favorite.StudentId,
-                LocationId = favorite.LocationId,
-                Notes = favorite.Notes,
-                CreatedAt = favorite.CreatedAt,
-                LocationName = favorite.Location.Name,
-                LocationDescription = favorite.Location.Description,
-                Coordinates = favorite.Location.Coordinates,
-                Address = favorite.Location.Address,
-                City = favorite.Location.City,
-                Rating = favorite.Location.Rating,
-                ImageUrl = favorite.Location.ImageUrl
-            };
-
+            var response = await _favoritesService.UpdateFavoriteAsync(userId.Value, id, request);
             return Ok(response);
         }
         catch (Exception ex)
@@ -293,23 +188,23 @@ public class FavoritesController : ControllerBase
     {
         try
         {
-            var studentId = await GetStudentIdFromContext();
-            if (studentId == null)
+            var clientIdClaim = User.FindFirst("client_id")?.Value;
+            if (string.IsNullOrEmpty(clientIdClaim))
             {
                 return Unauthorized("Invalid service token");
             }
 
-            var favorite = await _context.FavoriteLocations
-                .FirstOrDefaultAsync(f => f.Id == id && f.StudentId == studentId && !f.IsDeleted);
+            var userId = await _favoritesService.GetUserIdFromClientIdAsync(clientIdClaim);
+            if (userId == null)
+            {
+                return Unauthorized("Invalid service token");
+            }
 
-            if (favorite == null)
+            var deleted = await _favoritesService.RemoveFavoriteAsync(userId.Value, id);
+            if (!deleted)
             {
                 return NotFound();
             }
-
-            favorite.IsDeleted = true;
-            await _context.SaveChangesAsync();
-
             return NoContent();
         }
         catch (Exception ex)
@@ -331,15 +226,19 @@ public class FavoritesController : ControllerBase
     {
         try
         {
-            var studentId = await GetStudentIdFromContext();
-            if (studentId == null)
+            var clientIdClaim = User.FindFirst("client_id")?.Value;
+            if (string.IsNullOrEmpty(clientIdClaim))
             {
                 return Unauthorized("Invalid service token");
             }
 
-            var isFavorite = await _context.FavoriteLocations
-                .AnyAsync(f => f.StudentId == studentId && f.LocationId == locationId && !f.IsDeleted);
+            var userId = await _favoritesService.GetUserIdFromClientIdAsync(clientIdClaim);
+            if (userId == null)
+            {
+                return Unauthorized("Invalid service token");
+            }
 
+            var isFavorite = await _favoritesService.CheckFavoriteAsync(userId.Value, locationId);
             return Ok(new { isFavorite });
         }
         catch (Exception ex)

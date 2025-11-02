@@ -3,7 +3,7 @@ namespace GeoStud.Api.DTOs.Location;
 public class FavoriteLocationResponse
 {
     public int Id { get; set; }
-    public int StudentId { get; set; }
+    public int UserId { get; set; }
     public int LocationId { get; set; }
     public string? Notes { get; set; }
     public DateTime CreatedAt { get; set; }

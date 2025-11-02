@@ -13,8 +13,8 @@ public class GeoStudDbContext : DbContext
     public DbSet<ServiceClient> ServiceClients { get; set; }
     
     // GeoStud entities
-    public DbSet<Student> Students { get; set; }
-    public DbSet<StudentResponse> StudentResponses { get; set; }
+    public DbSet<User> Users { get; set; }
+    public DbSet<UserAnalyticsResponse> UserAnalyticsResponses { get; set; }
     public DbSet<AnalyticsData> AnalyticsData { get; set; }
     public DbSet<FavoriteLocation> FavoriteLocations { get; set; }
     
@@ -36,8 +36,8 @@ public class GeoStudDbContext : DbContext
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
         });
 
-        // Student configuration
-        modelBuilder.Entity<Student>(entity =>
+        // User configuration
+        modelBuilder.Entity<User>(entity =>
         {
             entity.HasIndex(e => e.Username).IsUnique();
             entity.HasIndex(e => e.Email).IsUnique();
@@ -49,14 +49,14 @@ public class GeoStudDbContext : DbContext
             entity.HasIndex(e => e.IsLocal);
         });
 
-        // StudentResponse configuration
-        modelBuilder.Entity<StudentResponse>(entity =>
+        // UserAnalyticsResponse configuration
+        modelBuilder.Entity<UserAnalyticsResponse>(entity =>
         {
-            entity.HasIndex(e => new { e.StudentId, e.Question });
+            entity.HasIndex(e => new { e.UserId, e.Question });
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
-            entity.HasOne(e => e.Student)
-                .WithMany(s => s.Responses)
-                .HasForeignKey(e => e.StudentId)
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.Responses)
+                .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -125,11 +125,11 @@ public class GeoStudDbContext : DbContext
         modelBuilder.Entity<FavoriteLocation>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.StudentId, e.LocationId }).IsUnique();
+            entity.HasIndex(e => new { e.UserId, e.LocationId }).IsUnique();
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
-            entity.HasOne(e => e.Student)
-                .WithMany(s => s.FavoriteLocations)
-                .HasForeignKey(e => e.StudentId)
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.FavoriteLocations)
+                .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(e => e.Location)
                 .WithMany(l => l.FavoriteLocations)
@@ -139,8 +139,8 @@ public class GeoStudDbContext : DbContext
 
         // Global query filters for soft delete
         modelBuilder.Entity<ServiceClient>().HasQueryFilter(e => !e.IsDeleted);
-        modelBuilder.Entity<Student>().HasQueryFilter(e => !e.IsDeleted);
-        modelBuilder.Entity<StudentResponse>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<User>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<UserAnalyticsResponse>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<AnalyticsData>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<FavoriteLocation>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<Location>().HasQueryFilter(e => !e.IsDeleted);

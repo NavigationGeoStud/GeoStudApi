@@ -5,6 +5,7 @@ using Microsoft.OpenApi.Models;
 using System.Text;
 using GeoStud.Api.Data;
 using GeoStud.Api.Services;
+using GeoStud.Api.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -98,6 +99,11 @@ builder.Services.AddVersionedApiExplorer(options =>
 
 // Custom Services
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ILocationService, LocationService>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
+builder.Services.AddScoped<IFavoritesService, FavoritesService>();
+builder.Services.AddScoped<ICategoryService, CategoryService>();
 
 // Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();

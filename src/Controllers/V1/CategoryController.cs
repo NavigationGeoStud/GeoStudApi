@@ -1,24 +1,24 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using GeoStud.Api.Data;
 using GeoStud.Api.DTOs.Location;
-using GeoStud.Api.Models;
+using GeoStud.Api.Services.Interfaces;
 
 namespace GeoStud.Api.Controllers.V1;
 
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
+
 [Authorize]
+[Tags("Private")]
 public class CategoryController : ControllerBase
 {
-    private readonly GeoStudDbContext _context;
+    private readonly ICategoryService _categoryService;
     private readonly ILogger<CategoryController> _logger;
 
-    public CategoryController(GeoStudDbContext context, ILogger<CategoryController> logger)
+    public CategoryController(ICategoryService categoryService, ILogger<CategoryController> logger)
     {
-        _context = context;
+        _categoryService = categoryService;
         _logger = logger;
     }
 
@@ -33,23 +33,8 @@ public class CategoryController : ControllerBase
     {
         try
         {
-            var categories = await _context.LocationCategories
-                .Where(c => !c.IsDeleted)
-                .OrderBy(c => c.DisplayOrder)
-                .ToListAsync();
-
-            var responses = categories.Select(c => new CategoryResponse
-            {
-                Id = c.Id,
-                Name = c.Name,
-                IconName = c.IconName,
-                Description = c.Description,
-                DisplayOrder = c.DisplayOrder,
-                IsActive = c.IsActive,
-                CreatedAt = c.CreatedAt
-            }).ToList();
-
-            return Ok(responses);
+            var categories = await _categoryService.GetCategoriesAsync();
+            return Ok(categories);
         }
         catch (Exception ex)
         {
@@ -71,26 +56,12 @@ public class CategoryController : ControllerBase
     {
         try
         {
-            var category = await _context.LocationCategories
-                .FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted);
-
+            var category = await _categoryService.GetCategoryByIdAsync(id);
             if (category == null)
             {
                 return NotFound();
             }
-
-            var response = new CategoryResponse
-            {
-                Id = category.Id,
-                Name = category.Name,
-                IconName = category.IconName,
-                Description = category.Description,
-                DisplayOrder = category.DisplayOrder,
-                IsActive = category.IsActive,
-                CreatedAt = category.CreatedAt
-            };
-
-            return Ok(response);
+            return Ok(category);
         }
         catch (Exception ex)
         {
@@ -112,49 +83,12 @@ public class CategoryController : ControllerBase
     {
         try
         {
-            var category = await _context.LocationCategories
-                .FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted);
-
-            if (category == null)
-            {
-                return NotFound();
-            }
-
-            var locations = await _context.Locations
-                .Where(l => l.CategoryId == id && !l.IsDeleted)
-                .ToListAsync();
-
-            var responses = locations.Select(l => new
-            {
-                l.Id,
-                l.Name,
-                l.Description,
-                l.Coordinates,
-                l.Address,
-                l.City,
-                l.Phone,
-                l.Website,
-                l.ImageUrl,
-                l.Rating,
-                l.RatingCount,
-                l.PriceRange,
-                l.WorkingHours,
-                l.IsActive,
-                l.IsVerified
-            }).ToList();
-
-            return Ok(new { 
-                category = new {
-                    category.Id,
-                    category.Name,
-                    category.IconName,
-                    category.Description,
-                    category.DisplayOrder,
-                    category.IsActive,
-                    category.CreatedAt
-                }, 
-                locations = responses 
-            });
+            var result = await _categoryService.GetCategoryLocationsAsync(id);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return NotFound(new { error = ex.Message });
         }
         catch (Exception ex)
         {
@@ -174,23 +108,8 @@ public class CategoryController : ControllerBase
     {
         try
         {
-            var subcategories = await _context.LocationSubcategories
-                .Where(s => !s.IsDeleted)
-                .OrderBy(s => s.DisplayOrder)
-                .ToListAsync();
-
-            var responses = subcategories.Select(s => new SubcategoryResponse
-            {
-                Id = s.Id,
-                Name = s.Name,
-                CategoryId = s.CategoryId,
-                Description = s.Description,
-                DisplayOrder = s.DisplayOrder,
-                IsActive = s.IsActive,
-                CreatedAt = s.CreatedAt
-            }).ToList();
-
-            return Ok(responses);
+            var subcategories = await _categoryService.GetSubcategoriesAsync();
+            return Ok(subcategories);
         }
         catch (Exception ex)
         {
@@ -211,23 +130,8 @@ public class CategoryController : ControllerBase
     {
         try
         {
-            var subcategories = await _context.LocationSubcategories
-                .Where(s => s.CategoryId == categoryId && !s.IsDeleted)
-                .OrderBy(s => s.DisplayOrder)
-                .ToListAsync();
-
-            var responses = subcategories.Select(s => new SubcategoryResponse
-            {
-                Id = s.Id,
-                Name = s.Name,
-                CategoryId = s.CategoryId,
-                Description = s.Description,
-                DisplayOrder = s.DisplayOrder,
-                IsActive = s.IsActive,
-                CreatedAt = s.CreatedAt
-            }).ToList();
-
-            return Ok(responses);
+            var subcategories = await _categoryService.GetSubcategoriesByCategoryAsync(categoryId);
+            return Ok(subcategories);
         }
         catch (Exception ex)
         {
@@ -249,26 +153,12 @@ public class CategoryController : ControllerBase
     {
         try
         {
-            var subcategory = await _context.LocationSubcategories
-                .FirstOrDefaultAsync(s => s.Id == id && !s.IsDeleted);
-
+            var subcategory = await _categoryService.GetSubcategoryByIdAsync(id);
             if (subcategory == null)
             {
                 return NotFound();
             }
-
-            var response = new SubcategoryResponse
-            {
-                Id = subcategory.Id,
-                Name = subcategory.Name,
-                CategoryId = subcategory.CategoryId,
-                Description = subcategory.Description,
-                DisplayOrder = subcategory.DisplayOrder,
-                IsActive = subcategory.IsActive,
-                CreatedAt = subcategory.CreatedAt
-            };
-
-            return Ok(response);
+            return Ok(subcategory);
         }
         catch (Exception ex)
         {

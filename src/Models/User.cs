@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace GeoStud.Api.Models;
 
-public class Student : BaseEntity
+public class User : BaseEntity
 {
     [Required]
     [MaxLength(100)]
@@ -24,7 +24,7 @@ public class Student : BaseEntity
     
     public long? TelegramId { get; set; }
     
-    // Survey data
+    // User profile data
     [Required]
     [MaxLength(20)]
     public string AgeRange { get; set; } = string.Empty; // "17-22", "23-25", "26-30", "30+"
@@ -58,6 +58,6 @@ public class Student : BaseEntity
     public DateTime? LastLoginAt { get; set; }
     
     // Navigation properties
-    public virtual ICollection<StudentResponse> Responses { get; set; } = new List<StudentResponse>();
+    public virtual ICollection<UserAnalyticsResponse> Responses { get; set; } = new List<UserAnalyticsResponse>();
     public virtual ICollection<FavoriteLocation> FavoriteLocations { get; set; } = new List<FavoriteLocation>();
 }

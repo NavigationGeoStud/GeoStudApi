@@ -2,10 +2,10 @@ using System.ComponentModel.DataAnnotations;
 
 namespace GeoStud.Api.Models;
 
-public class StudentResponse : BaseEntity
+public class UserAnalyticsResponse : BaseEntity
 {
     [Required]
-    public int StudentId { get; set; }
+    public int UserId { get; set; }
     
     [Required]
     [MaxLength(100)]
@@ -21,5 +21,5 @@ public class StudentResponse : BaseEntity
     public int? Score { get; set; } // For numeric responses
     
     // Navigation properties
-    public virtual Student Student { get; set; } = null!;
+    public virtual User User { get; set; } = null!;
 }

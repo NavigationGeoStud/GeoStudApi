@@ -1,12 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using GeoStud.Api.DTOs.Auth;
-using GeoStud.Api.Services;
+using GeoStud.Api.Services.Interfaces;
 
 namespace GeoStud.Api.Controllers.V1;
 
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
+[Tags("General")]
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
