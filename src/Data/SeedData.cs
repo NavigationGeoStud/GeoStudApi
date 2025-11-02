@@ -7,7 +7,6 @@ public static class SeedData
 {
     public static async Task SeedAsync(GeoStudDbContext context)
     {
-        // Seed service clients
         if (!context.ServiceClients.Any())
         {
             var serviceClients = new List<ServiceClient>
@@ -36,70 +35,99 @@ public static class SeedData
             await context.SaveChangesAsync();
         }
         
-        // Seed location categories
-        if (!context.LocationCategories.Any())
+        // Seed location categories - ensure required categories exist
+        var existingCategories = await context.LocationCategories.ToListAsync();
+        var existingCategoryNames = existingCategories.Select(c => c.Name).ToHashSet();
+        
+        var categoriesToAdd = new List<LocationCategory>();
+        
+        if (!existingCategoryNames.Contains("Кино"))
         {
-            var categories = new List<LocationCategory>
+            categoriesToAdd.Add(new LocationCategory
             {
-                new LocationCategory
-                {
-                    Name = "Кино",
-                    IconName = "movie",
-                    Description = "Кинотеатры и кино",
-                    DisplayOrder = 1,
-                    IsActive = true
-                },
-                new LocationCategory
-                {
-                    Name = "Концерты",
-                    IconName = "concerts",
-                    Description = "Концерты и музыкальные мероприятия",
-                    DisplayOrder = 2,
-                    IsActive = true
-                },
-                new LocationCategory
-                {
-                    Name = "Театры",
-                    IconName = "theatre",
-                    Description = "Театральные постановки и спектакли",
-                    DisplayOrder = 3,
-                    IsActive = true
-                },
-                new LocationCategory
-                {
-                    Name = "Музеи",
-                    IconName = "museums",
-                    Description = "Музеи и выставки",
-                    DisplayOrder = 4,
-                    IsActive = true
-                },
-                new LocationCategory
-                {
-                    Name = "Памятники",
-                    IconName = "landmark",
-                    Description = "Памятники и исторические места",
-                    DisplayOrder = 5,
-                    IsActive = true
-                },
-                new LocationCategory
-                {
-                    Name = "Загородный отдых",
-                    IconName = "suburban",
-                    Description = "Места для загородного отдыха",
-                    DisplayOrder = 6,
-                    IsActive = true
-                },
-                new LocationCategory
-                {
-                    Name = "Туристические маршруты",
-                    IconName = "tourist",
-                    Description = "Туристические маршруты и экскурсии",
-                    DisplayOrder = 7,
-                    IsActive = true
-                }
-            };
-            
-            context.LocationCategories.AddRange(categories);
+                Name = "Кино",
+                IconName = "movie",
+                Description = "Кинотеатры и кино",
+                DisplayOrder = 1,
+                IsActive = true
+            });
+        }
+        
+        if (!existingCategoryNames.Contains("Концерты"))
+        {
+            categoriesToAdd.Add(new LocationCategory
+            {
+                Name = "Концерты",
+                IconName = "concerts",
+                Description = "Концерты и музыкальные мероприятия",
+                DisplayOrder = 2,
+                IsActive = true
+            });
+        }
+        
+        if (!existingCategoryNames.Contains("Театры"))
+        {
+            categoriesToAdd.Add(new LocationCategory
+            {
+                Name = "Театры",
+                IconName = "theatre",
+                Description = "Театральные постановки и спектакли",
+                DisplayOrder = 3,
+                IsActive = true
+            });
+        }
+        
+        if (!existingCategoryNames.Contains("Музеи"))
+        {
+            categoriesToAdd.Add(new LocationCategory
+            {
+                Name = "Музеи",
+                IconName = "museums",
+                Description = "Музеи и выставки",
+                DisplayOrder = 4,
+                IsActive = true
+            });
+        }
+        
+        if (!existingCategoryNames.Contains("Памятники"))
+        {
+            categoriesToAdd.Add(new LocationCategory
+            {
+                Name = "Памятники",
+                IconName = "landmark",
+                Description = "Памятники и исторические места",
+                DisplayOrder = 5,
+                IsActive = true
+            });
+        }
+        
+        if (!existingCategoryNames.Contains("Загородный отдых"))
+        {
+            categoriesToAdd.Add(new LocationCategory
+            {
+                Name = "Загородный отдых",
+                IconName = "suburban",
+                Description = "Места для загородного отдыха",
+                DisplayOrder = 6,
+                IsActive = true
+            });
+        }
+        
+        if (!existingCategoryNames.Contains("Туристические маршруты"))
+        {
+            categoriesToAdd.Add(new LocationCategory
+            {
+                Name = "Туристические маршруты",
+                IconName = "tourist",
+                Description = "Туристические маршруты и экскурсии",
+                DisplayOrder = 7,
+                IsActive = true
+            });
+        }
+        
+        if (categoriesToAdd.Any())
+        {
+            context.LocationCategories.AddRange(categoriesToAdd);
             await context.SaveChangesAsync();
         }
         
@@ -108,8 +136,15 @@ public static class SeedData
         {
             var subcategories = new List<LocationSubcategory>();
             
+            // Reload categories from database to ensure we have the latest data including newly added categories
+            var categories = await context.LocationCategories.ToListAsync();
+            
             // Театры subcategories
-            var theatreCategory = await context.LocationCategories.FirstAsync(c => c.Name == "Театры");
+            var theatreCategory = categories.FirstOrDefault(c => c.Name == "Театры" && !c.IsDeleted);
+            if (theatreCategory == null)
+            {
+                throw new InvalidOperationException("Location category 'Театры' not found or is deleted. Ensure categories are seeded before subcategories.");
+            }
             subcategories.AddRange(new[]
             {
                 new LocationSubcategory { Name = "Драма", CategoryId = theatreCategory.Id, DisplayOrder = 1, IsActive = true },
@@ -121,7 +156,11 @@ public static class SeedData
             });
             
             // Кино subcategories
-            var movieCategory = await context.LocationCategories.FirstAsync(c => c.Name == "Кино");
+            var movieCategory = categories.FirstOrDefault(c => c.Name == "Кино" && !c.IsDeleted);
+            if (movieCategory == null)
+            {
+                throw new InvalidOperationException("Location category 'Кино' not found or is deleted. Ensure categories are seeded before subcategories.");
+            }
             subcategories.AddRange(new[]
             {
                 new LocationSubcategory { Name = "Драма", CategoryId = movieCategory.Id, DisplayOrder = 1, IsActive = true },
@@ -135,7 +174,11 @@ public static class SeedData
             });
             
             // Концерты subcategories
-            var concertsCategory = await context.LocationCategories.FirstAsync(c => c.Name == "Концерты");
+            var concertsCategory = categories.FirstOrDefault(c => c.Name == "Концерты" && !c.IsDeleted);
+            if (concertsCategory == null)
+            {
+                throw new InvalidOperationException("Location category 'Концерты' not found or is deleted. Ensure categories are seeded before subcategories.");
+            }
             subcategories.AddRange(new[]
             {
                 new LocationSubcategory { Name = "Рок", CategoryId = concertsCategory.Id, DisplayOrder = 1, IsActive = true },

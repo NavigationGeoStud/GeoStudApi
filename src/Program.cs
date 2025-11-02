@@ -22,7 +22,7 @@ if (args.Contains("--sqlite") || args.Contains("--local") || Environment.GetEnvi
     builder.Environment.EnvironmentName = "Local";
 }
 
-Console.WriteLine($"🔧 Database Provider: {(useSqlite ? "SQLite" : "SQL Server")}");
+Console.WriteLine($"🔧 Database Provider: {(useSqlite ? "SQLite" : "PosgressDB")}");
 Console.WriteLine($"🌍 Environment: {builder.Environment.EnvironmentName}");
 
 // Add services to the container
@@ -44,8 +44,8 @@ if (useSqlite)
 }
 else
 {
-    var sqlServerConnection = builder.Configuration.GetConnectionString("DefaultConnection");
-    if (string.IsNullOrEmpty(sqlServerConnection))
+    var PosgressServerConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+    if (string.IsNullOrEmpty(PosgressServerConnection))
     {
         Console.WriteLine("❌ SQL Server connection string is empty!");
         Console.WriteLine("🔧 Available connection strings:");
@@ -54,13 +54,13 @@ else
         {
             Console.WriteLine($"  - {connStr.Key}: {connStr.Value}");
         }
-        throw new InvalidOperationException("SQL Server connection string is not configured");
+        throw new InvalidOperationException("Posgress Db connection string is not configured");
     }
     
     builder.Services.AddDbContext<GeoStudDbContext>(options =>
-        options.UseSqlServer(sqlServerConnection));
-    Console.WriteLine("📊 Using SQL Server database");
-    Console.WriteLine($"🔗 Connection: {sqlServerConnection}");
+        options.UseSqlServer(PosgressServerConnection));
+    Console.WriteLine("📊 Using Posgress Server database");
+    Console.WriteLine($"🔗 Connection: {PosgressServerConnection}");
 }
 
 // Authentication & Authorization
