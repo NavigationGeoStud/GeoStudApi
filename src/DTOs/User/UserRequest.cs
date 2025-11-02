@@ -4,6 +4,13 @@ namespace GeoStud.Api.DTOs.User;
 
 public class UserRequest
 {
+    [Required]
+    [MaxLength(100)]
+    public string Username { get; set; } = string.Empty;
+    
+    [MaxLength(100)]
+    public string? FirstName { get; set; }
+    
     public long? TelegramId { get; set; }
     
     [Required]

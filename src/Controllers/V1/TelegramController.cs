@@ -159,14 +159,32 @@ public class TelegramController : ControllerBase
             var allCategories = await _categoryService.GetCategoriesAsync();
             var categoriesList = allCategories.ToList();
 
-            // Match categories with user interests
-            var matchedCategories = categoriesList
-                .Where(c => user.Interests.Any(i =>
-                    c.Name.Contains(i, StringComparison.OrdinalIgnoreCase) ||
-                    i.Contains(c.Name, StringComparison.OrdinalIgnoreCase)))
-                .ToList();
+            // If user has interests, try to match categories with user interests
+            // Otherwise, return all categories
+            List<CategoryResponse> resultCategories;
+            
+            if (user.Interests != null && user.Interests.Any())
+            {
+                // Match categories with user interests
+                var matchedCategories = categoriesList
+                    .Where(c => user.Interests.Any(i =>
+                        c.Name.Contains(i, StringComparison.OrdinalIgnoreCase) ||
+                        i.Contains(c.Name, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+                
+                // If we found matching categories, return them
+                // Otherwise, return all categories so user can see what's available
+                resultCategories = matchedCategories.Any() 
+                    ? matchedCategories 
+                    : categoriesList;
+            }
+            else
+            {
+                // No interests, return all categories
+                resultCategories = categoriesList;
+            }
 
-            return Ok(matchedCategories);
+            return Ok(resultCategories);
         }
         catch (Exception ex)
         {
@@ -326,17 +344,17 @@ public class TelegramController : ControllerBase
     }
 
     /// <summary>
-    /// Get recommended locations by category ID with pagination
+    /// Get recommended locations by category ID with pagination, or all locations if categoryId is not provided
     /// </summary>
-    /// <param name="categoryId">Category ID to filter locations</param>
+    /// <param name="categoryId">Category ID to filter locations (optional - if not provided, returns all locations)</param>
     /// <param name="page">Page number (default: 1)</param>
     /// <param name="pageSize">Page size (default: 20)</param>
-    /// <returns>Paginated list of locations in category</returns>
+    /// <returns>Paginated list of locations in category or all locations</returns>
     [HttpGet("locations/recommended")]
     [ProducesResponseType(typeof(PagedResponse<LocationResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetRecommendedLocationsByCategory([FromQuery] int categoryId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    public async Task<IActionResult> GetRecommendedLocationsByCategory([FromQuery] int? categoryId = null, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
         try
         {
@@ -344,7 +362,19 @@ public class TelegramController : ControllerBase
             if (pageSize < 1) pageSize = 20;
             if (pageSize > 100) pageSize = 100;
 
-            var allLocations = await _locationService.GetLocationsByCategoryAsync(categoryId);
+            IEnumerable<LocationResponse> allLocations;
+            
+            // If categoryId is provided, get locations by category
+            // Otherwise, get all locations
+            if (categoryId.HasValue)
+            {
+                allLocations = await _locationService.GetLocationsByCategoryAsync(categoryId.Value);
+            }
+            else
+            {
+                allLocations = await _locationService.GetLocationsAsync();
+            }
+            
             var locationsList = allLocations.ToList();
             
             var totalCount = locationsList.Count;

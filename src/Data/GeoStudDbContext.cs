@@ -40,7 +40,10 @@ public class GeoStudDbContext : DbContext
         modelBuilder.Entity<User>(entity =>
         {
             entity.HasIndex(e => e.Username).IsUnique();
+            // Email can be nullable for Telegram users, but if provided must be unique
+            // SQLite allows null values in unique indexes, multiple nulls are allowed
             entity.HasIndex(e => e.Email).IsUnique();
+            // TelegramId must be unique if provided
             entity.HasIndex(e => e.TelegramId).IsUnique();
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
             entity.HasIndex(e => e.AgeRange);

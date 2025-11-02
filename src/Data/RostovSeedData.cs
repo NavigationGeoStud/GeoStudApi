@@ -10,18 +10,15 @@ public static class RostovSeedData
         // Seed Rostov locations for each category
         if (!context.Locations.Any(l => l.City == "Ростов-на-Дону"))
         {
-            // Get categories first
+            // Get categories first - use actual categories from SeedData
             var categories = await context.LocationCategories.ToListAsync();
-            var cafeCategory = categories.FirstOrDefault(c => c.Name == "Кафе и рестораны");
-            var entertainmentCategory = categories.FirstOrDefault(c => c.Name == "Развлечения");
-            var educationCategory = categories.FirstOrDefault(c => c.Name == "Учеба");
-            var sportCategory = categories.FirstOrDefault(c => c.Name == "Спорт");
-            var relaxCategory = categories.FirstOrDefault(c => c.Name == "Отдых");
-            var shoppingCategory = categories.FirstOrDefault(c => c.Name == "Торговля");
-            var nightlifeCategory = categories.FirstOrDefault(c => c.Name == "Ночная жизнь");
-            var cultureCategory = categories.FirstOrDefault(c => c.Name == "Культура");
-            var transportCategory = categories.FirstOrDefault(c => c.Name == "Общественный транспорт");
-            var servicesCategory = categories.FirstOrDefault(c => c.Name == "Услуги");
+            var movieCategory = categories.FirstOrDefault(c => c.Name == "Кино");
+            var concertsCategory = categories.FirstOrDefault(c => c.Name == "Концерты");
+            var theatreCategory = categories.FirstOrDefault(c => c.Name == "Театры");
+            var museumsCategory = categories.FirstOrDefault(c => c.Name == "Музеи");
+            var landmarksCategory = categories.FirstOrDefault(c => c.Name == "Памятники");
+            var suburbanCategory = categories.FirstOrDefault(c => c.Name == "Загородный отдых");
+            var touristCategory = categories.FirstOrDefault(c => c.Name == "Туристические маршруты");
             
             // Use first category as fallback if specific category not found
             var defaultCategoryId = categories.FirstOrDefault()?.Id ?? 1;
@@ -899,66 +896,42 @@ public static class RostovSeedData
                 }
             };
 
-            // Set CategoryId for each location based on their group
+            // Set CategoryId for each location based on existing categories
             foreach (var location in rostovLocations)
             {
-                // Determine category based on location name patterns
-                if (location.Name.Contains("Ресторан") || location.Name.Contains("Кафе") || 
-                    location.Name.Contains("Пиццерия") || location.Name.Contains("Булочная"))
+                // Determine category based on location name and type
+                if (location.Name.Contains("Кинотеатр"))
                 {
-                    location.CategoryId = cafeCategory?.Id ?? defaultCategoryId;
+                    location.CategoryId = movieCategory?.Id ?? defaultCategoryId;
                 }
-                else if (location.Name.Contains("Кинотеатр") || location.Name.Contains("Боулинг") || 
-                         location.Name.Contains("Караоке") || location.Name.Contains("Развлекательный") || 
-                         location.Name.Contains("Бильярдный"))
+                else if (location.Name.Contains("Концертный") || location.Name.Contains("Караоке") || 
+                         location.Name.Contains("Клуб") || location.Name.Contains("Бар"))
                 {
-                    location.CategoryId = entertainmentCategory?.Id ?? defaultCategoryId;
+                    location.CategoryId = concertsCategory?.Id ?? defaultCategoryId;
                 }
-                else if (location.Name.Contains("Библиотека") || location.Name.Contains("Коворкинг") || 
-                         location.Name.Contains("Учебный") || location.Name.Contains("Центр изучения"))
+                else if (location.Name.Contains("Театр"))
                 {
-                    location.CategoryId = educationCategory?.Id ?? defaultCategoryId;
+                    location.CategoryId = theatreCategory?.Id ?? defaultCategoryId;
                 }
-                else if (location.Name.Contains("Спорткомплекс") || location.Name.Contains("Фитнес") || 
-                         location.Name.Contains("Стадион") || location.Name.Contains("Теннисный") || 
-                         location.Name.Contains("Спортивная"))
+                else if (location.Name.Contains("Музей") || location.Name.Contains("Галерея"))
                 {
-                    location.CategoryId = sportCategory?.Id ?? defaultCategoryId;
+                    location.CategoryId = museumsCategory?.Id ?? defaultCategoryId;
                 }
                 else if (location.Name.Contains("Парк") || location.Name.Contains("Набережная") || 
                          location.Name.Contains("Сквер") || location.Name.Contains("Ботанический") || 
-                         location.Name.Contains("Пляж"))
+                         location.Name.Contains("Пляж") || location.Name.Contains("Боулинг") ||
+                         location.Name.Contains("Развлекательный") || location.Name.Contains("Бильярдный"))
                 {
-                    location.CategoryId = relaxCategory?.Id ?? defaultCategoryId;
+                    location.CategoryId = suburbanCategory?.Id ?? defaultCategoryId;
                 }
-                else if (location.Name.Contains("ТРЦ") || location.Name.Contains("ТЦ") || 
-                         location.Name.Contains("Рынок") || location.Name.Contains("Магазин"))
+                else if (location.Name.Contains("Памятник") || location.Description?.Contains("историческое место") == true)
                 {
-                    location.CategoryId = shoppingCategory?.Id ?? defaultCategoryId;
-                }
-                else if (location.Name.Contains("Клуб") || location.Name.Contains("Бар"))
-                {
-                    location.CategoryId = nightlifeCategory?.Id ?? defaultCategoryId;
-                }
-                else if (location.Name.Contains("Музей") || location.Name.Contains("Театр") || 
-                         location.Name.Contains("Галерея") || location.Name.Contains("Концертный"))
-                {
-                    location.CategoryId = cultureCategory?.Id ?? defaultCategoryId;
-                }
-                else if (location.Name.Contains("Вокзал") || location.Name.Contains("Остановка") || 
-                         location.Name.Contains("Станция") || location.Name.Contains("Такси"))
-                {
-                    location.CategoryId = transportCategory?.Id ?? defaultCategoryId;
-                }
-                else if (location.Name.Contains("Сбербанк") || location.Name.Contains("Почта") || 
-                         location.Name.Contains("Салон") || location.Name.Contains("Медицинский") || 
-                         location.Name.Contains("Аптека"))
-                {
-                    location.CategoryId = servicesCategory?.Id ?? defaultCategoryId;
+                    location.CategoryId = landmarksCategory?.Id ?? defaultCategoryId;
                 }
                 else
                 {
-                    // Default to first category if no pattern matches
+                    // Default to first category (Кино) if no pattern matches
+                    // This includes: кафе, рестораны, библиотеки, спорт, торговля, транспорт, услуги
                     location.CategoryId = defaultCategoryId;
                 }
             }

@@ -7,6 +7,12 @@ namespace GeoStud.Api.DTOs.User;
 /// </summary>
 public class UpdateUserRequest
 {
+    [MaxLength(100)]
+    public string? Username { get; set; }
+    
+    [MaxLength(100)]
+    public string? FirstName { get; set; }
+    
     public long? TelegramId { get; set; }
     
     [MaxLength(20)]

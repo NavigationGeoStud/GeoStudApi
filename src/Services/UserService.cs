@@ -21,15 +21,30 @@ public class UserService : IUserService
 
     public async Task<UserResponseDto> SubmitUserAsync(string clientId, UserRequest request)
     {
-        // Check if user already exists
-        var username = $"service_{clientId}";
-        var existingUser = await _context.Users
-            .FirstOrDefaultAsync(s => s.Username == username);
+        // For Telegram users, check by TelegramId if provided, otherwise by Username
+        User? existingUser = null;
+        
+        if (request.TelegramId.HasValue)
+        {
+            existingUser = await _context.Users
+                .FirstOrDefaultAsync(s => s.TelegramId == request.TelegramId);
+        }
+        
+        if (existingUser == null)
+        {
+            existingUser = await _context.Users
+                .FirstOrDefaultAsync(s => s.Username == request.Username);
+        }
 
         User user;
         if (existingUser != null)
         {
             // Update existing user
+            existingUser.Username = request.Username;
+            if (!string.IsNullOrEmpty(request.FirstName))
+            {
+                existingUser.FirstName = request.FirstName;
+            }
             existingUser.TelegramId = request.TelegramId;
             existingUser.AgeRange = request.AgeRange;
             existingUser.IsStudent = request.IsStudent;
@@ -45,12 +60,13 @@ public class UserService : IUserService
         }
         else
         {
-            // Create new user
+            // Create new user (for Telegram users, Email and PasswordHash are optional)
             user = new User
             {
-                Username = username,
-                Email = $"{clientId}@service.local",
-                PasswordHash = "service_user", // Not used for service users
+                Username = request.Username,
+                FirstName = request.FirstName,
+                Email = null, // Not required for Telegram users
+                PasswordHash = null, // Not required for Telegram users
                 TelegramId = request.TelegramId,
                 AgeRange = request.AgeRange,
                 IsStudent = request.IsStudent,
@@ -144,6 +160,18 @@ public class UserService : IUserService
 
         // Update only provided fields
         bool hasChanges = false;
+
+        if (!string.IsNullOrEmpty(request.Username) && user.Username != request.Username)
+        {
+            user.Username = request.Username;
+            hasChanges = true;
+        }
+
+        if (request.FirstName != null && user.FirstName != request.FirstName)
+        {
+            user.FirstName = request.FirstName;
+            hasChanges = true;
+        }
 
         if (request.TelegramId.HasValue && user.TelegramId != request.TelegramId)
         {
@@ -460,6 +488,7 @@ public class UserService : IUserService
             UserId = user.Id,
             TelegramId = user.TelegramId,
             Username = user.Username,
+            FirstName = user.FirstName,
             Email = user.Email,
             AgeRange = user.AgeRange,
             IsStudent = user.IsStudent,
