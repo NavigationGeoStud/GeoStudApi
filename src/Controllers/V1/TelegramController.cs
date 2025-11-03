@@ -7,6 +7,9 @@ using UserResponseDto = GeoStud.Api.DTOs.User.UserResponse;
 using GeoStud.Api.Services.Interfaces;
 using RoleCheckResponse = GeoStud.Api.DTOs.User.RoleCheckResponse;
 using AssignRoleRequest = GeoStud.Api.DTOs.User.AssignRoleRequest;
+using UpdateRoleRequest = GeoStud.Api.DTOs.User.UpdateRoleRequest;
+using CreateLocationTelegramRequest = GeoStud.Api.DTOs.Location.CreateLocationTelegramRequest;
+using GeoStud.Api.Models;
 
 namespace GeoStud.Api.Controllers.V1;
 
@@ -561,6 +564,121 @@ public class TelegramController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error assigning role");
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    /// <summary>
+    /// Update user role (only Admin can update roles)
+    /// </summary>
+    /// <param name="username">Username of the user whose role should be updated</param>
+    /// <param name="request">Role update request with new role</param>
+    /// <param name="adminUsername">Username of the admin making the request</param>
+    /// <returns>Success status</returns>
+    [HttpPut("role/{username}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateUserRole(string username, [FromBody] UpdateRoleRequest request, [FromQuery] string adminUsername)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            if (string.IsNullOrEmpty(adminUsername))
+            {
+                return BadRequest(new { error = "adminUsername query parameter is required" });
+            }
+
+            if (string.IsNullOrEmpty(username))
+            {
+                return BadRequest(new { error = "Username is required in route" });
+            }
+
+            // Verify admin has permission
+            var isAdmin = await _roleService.IsUserAdminByUsernameAsync(adminUsername);
+            if (!isAdmin)
+            {
+                _logger.LogWarning("Unauthorized role update attempt. Username: {Username} is not an admin", adminUsername);
+                return StatusCode(403, new { error = "Only administrators can update roles" });
+            }
+
+            // Create AssignRoleRequest from route and body
+            var assignRoleRequest = new AssignRoleRequest
+            {
+                Username = username,
+                Role = request.Role
+            };
+
+            var success = await _roleService.AssignRoleAsync(adminUsername, assignRoleRequest);
+            if (!success)
+            {
+                return NotFound(new { error = "Failed to update role. Target user may not exist or role is invalid." });
+            }
+
+            return Ok(new { message = "Role updated successfully", username = username, role = request.Role });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating role");
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    /// <summary>
+    /// Create location (only Admin or Manager can create locations)
+    /// </summary>
+    /// <param name="request">Location creation request</param>
+    /// <param name="telegramId">Telegram ID of the user making the request</param>
+    /// <returns>Created location response</returns>
+    [HttpPost("location")]
+    [ProducesResponseType(typeof(LocationResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> CreateLocation([FromBody] CreateLocationTelegramRequest request, [FromQuery] long telegramId)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            if (telegramId == 0)
+            {
+                return BadRequest(new { error = "telegramId query parameter is required and must be a valid Telegram user ID" });
+            }
+
+            // Check user role - only Admin (2) or Manager (1) can create locations
+            var roleResponse = await _roleService.GetUserRoleAsync(telegramId);
+            if (roleResponse == null)
+            {
+                return NotFound(new { error = "User not found" });
+            }
+
+            if (!roleResponse.IsAdmin && !roleResponse.IsManager)
+            {
+                _logger.LogWarning("Unauthorized location creation attempt. TelegramId: {TelegramId} does not have required role", telegramId);
+                return StatusCode(403, new { error = "Only administrators and managers can create locations" });
+            }
+
+            var location = await _locationService.CreateLocationFromTelegramAsync(request);
+            return CreatedAtAction(nameof(GetAllLocations), new { telegramId }, location);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "Invalid location creation request");
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating location");
             return StatusCode(500, "Internal server error");
         }
     }

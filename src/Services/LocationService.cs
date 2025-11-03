@@ -3,6 +3,7 @@ using GeoStud.Api.Data;
 using GeoStud.Api.DTOs.Location;
 using GeoStud.Api.Models;
 using GeoStud.Api.Services.Interfaces;
+using CreateLocationTelegramRequest = GeoStud.Api.DTOs.Location.CreateLocationTelegramRequest;
 
 namespace GeoStud.Api.Services;
 
@@ -124,7 +125,7 @@ public class LocationService : ILocationService
             City = request.City,
             Phone = request.Phone,
             Website = request.Website,
-            ImageUrl = request.ImageUrl,
+            TelegramImageIds = request.TelegramImageIds,
             Rating = request.Rating,
             RatingCount = request.RatingCount,
             PriceRange = request.PriceRange,
@@ -215,7 +216,7 @@ public class LocationService : ILocationService
         location.City = request.City;
         location.Phone = request.Phone;
         location.Website = request.Website;
-        location.ImageUrl = request.ImageUrl;
+        location.TelegramImageIds = request.TelegramImageIds;
         location.Rating = request.Rating;
         location.RatingCount = request.RatingCount;
         location.PriceRange = request.PriceRange;
@@ -354,7 +355,7 @@ public class LocationService : ILocationService
             City = location.City,
             Phone = location.Phone,
             Website = location.Website,
-            ImageUrl = location.ImageUrl,
+            TelegramImageIds = location.TelegramImageIds,
             Rating = location.Rating,
             RatingCount = location.RatingCount,
             PriceRange = location.PriceRange,
@@ -400,6 +401,107 @@ public class LocationService : ILocationService
     private static double ToRadians(double degrees)
     {
         return degrees * Math.PI / 180.0;
+    }
+
+    public async Task<LocationResponse> CreateLocationFromTelegramAsync(CreateLocationTelegramRequest request)
+    {
+        // Convert to LocationRequest format for validation
+        var locationRequest = new LocationRequest
+        {
+            CategoryId = request.CategoryId,
+            SubcategoryIds = request.SubcategoryIds ?? new List<int>(),
+            Name = request.Name,
+            Description = request.Description,
+            Coordinates = request.Coordinates,
+            Address = request.Address,
+            City = request.City,
+            Phone = request.Phone,
+            Website = request.Website,
+            Rating = request.Rating,
+            PriceRange = request.PriceRange,
+            WorkingHours = request.WorkingHours,
+            IsActive = true,
+            IsVerified = false
+        };
+
+        // Validate coordinates format
+        if (!LocationCoordinatesHelper.IsValidCoordinates(request.Coordinates))
+        {
+            throw new ArgumentException("Invalid coordinates format. Expected format: 'latitude,longitude'", nameof(request));
+        }
+
+        // Validate category exists and is active
+        var category = await _context.LocationCategories
+            .FirstOrDefaultAsync(c => c.Id == request.CategoryId && c.IsActive && !c.IsDeleted);
+
+        if (category == null)
+        {
+            throw new ArgumentException("Category not found or inactive", nameof(request));
+        }
+
+        // Validate subcategories belong to the category
+        if (locationRequest.SubcategoryIds.Any())
+        {
+            var invalidSubcategories = await _context.LocationSubcategories
+                .Where(s => locationRequest.SubcategoryIds.Contains(s.Id) && (s.CategoryId != request.CategoryId || !s.IsActive))
+                .ToListAsync();
+
+            if (invalidSubcategories.Any())
+            {
+                throw new ArgumentException("Some subcategories do not belong to the selected category or are inactive", nameof(request));
+            }
+        }
+
+        var location = new Location
+        {
+            Name = request.Name,
+            Description = request.Description,
+            Coordinates = request.Coordinates,
+            Address = request.Address,
+            City = request.City,
+            Phone = request.Phone,
+            Website = request.Website,
+            TelegramImageIds = request.TelegramImageIds,
+            Rating = request.Rating,
+            PriceRange = request.PriceRange,
+            WorkingHours = request.WorkingHours,
+            IsActive = true,
+            IsVerified = false,
+            CategoryId = request.CategoryId
+        };
+
+        _context.Locations.Add(location);
+        await _context.SaveChangesAsync();
+
+        // Add subcategory associations
+        if (locationRequest.SubcategoryIds.Any())
+        {
+            var validSubcategories = await _context.LocationSubcategories
+                .Where(s => locationRequest.SubcategoryIds.Contains(s.Id) && s.IsActive)
+                .ToListAsync();
+
+            var subcategoryJoins = validSubcategories.Select(s => new LocationSubcategoryJoin
+            {
+                LocationId = location.Id,
+                SubcategoryId = s.Id
+            }).ToList();
+
+            _context.LocationSubcategoryJoins.AddRange(subcategoryJoins);
+            await _context.SaveChangesAsync();
+        }
+
+        // Reload with category and subcategories
+        await _context.Entry(location)
+            .Reference(l => l.Category)
+            .LoadAsync();
+            
+        await _context.Entry(location)
+            .Collection(l => l.SubcategoryJoins)
+            .Query()
+            .Include(sj => sj.Subcategory)
+            .LoadAsync();
+
+        return ToLocationResponse(location);
     }
 }
 

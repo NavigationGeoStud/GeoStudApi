@@ -28,8 +28,8 @@ public class Location : BaseEntity
     [MaxLength(500)]
     public string? Website { get; set; }
     
-    [MaxLength(500)]
-    public string? ImageUrl { get; set; }
+    [MaxLength(2000)]
+    public string? TelegramImageIds { get; set; } // Comma-separated Telegram image IDs
     
     public decimal? Rating { get; set; }
     

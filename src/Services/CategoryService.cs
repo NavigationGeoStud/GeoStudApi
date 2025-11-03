@@ -81,7 +81,7 @@ public class CategoryService : ICategoryService
             l.City,
             l.Phone,
             l.Website,
-            l.ImageUrl,
+            l.TelegramImageIds,
             l.Rating,
             l.RatingCount,
             l.PriceRange,

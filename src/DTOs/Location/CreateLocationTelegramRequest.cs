@@ -1,9 +1,15 @@
 using System.ComponentModel.DataAnnotations;
+using GeoStud.Api.Models;
 
 namespace GeoStud.Api.DTOs.Location;
 
-public class LocationRequest
+public class CreateLocationTelegramRequest
 {
+    [Required]
+    public int CategoryId { get; set; }
+    
+    public List<int>? SubcategoryIds { get; set; }
+    
     [Required]
     [MaxLength(255)]
     public string Name { get; set; } = string.Empty;
@@ -32,21 +38,10 @@ public class LocationRequest
     
     public decimal? Rating { get; set; }
     
-    public int? RatingCount { get; set; }
-    
     [MaxLength(20)]
     public string? PriceRange { get; set; }
     
     [MaxLength(100)]
     public string? WorkingHours { get; set; }
-    
-    public bool IsActive { get; set; } = true;
-    
-    public bool IsVerified { get; set; } = false;
-    
-    [Required]
-    public int CategoryId { get; set; }
-    
-    public List<int> SubcategoryIds { get; set; } = new();
 }
 

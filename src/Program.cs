@@ -243,8 +243,7 @@ using (var scope = app.Services.CreateScope())
     // Seed initial data
     await GeoStud.Api.Data.SeedData.SeedAsync(context);
     
-    // Seed Rostov locations
-    await GeoStud.Api.Data.RostovSeedData.SeedRostovLocationsAsync(context);
+    // Location seed data has been removed
     
     if (useSqlite)
     {

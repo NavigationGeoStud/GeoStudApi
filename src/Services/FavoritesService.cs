@@ -223,7 +223,7 @@ public class FavoritesService : IFavoritesService
             Address = favorite.Location.Address,
             City = favorite.Location.City,
             Rating = favorite.Location.Rating,
-            ImageUrl = favorite.Location.ImageUrl
+            TelegramImageIds = favorite.Location.TelegramImageIds
         };
     }
 }

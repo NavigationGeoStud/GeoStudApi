@@ -15,6 +15,6 @@ public class FavoriteLocationResponse
     public string? Address { get; set; }
     public string? City { get; set; }
     public decimal? Rating { get; set; }
-    public string? ImageUrl { get; set; }
+    public string? TelegramImageIds { get; set; }
 }
 
