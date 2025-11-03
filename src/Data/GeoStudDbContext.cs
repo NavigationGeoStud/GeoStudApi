@@ -50,6 +50,11 @@ public class GeoStudDbContext : DbContext
             entity.HasIndex(e => e.Gender);
             entity.HasIndex(e => e.IsStudent);
             entity.HasIndex(e => e.IsLocal);
+            // Role configuration - store as integer
+            // Default value is set in the model (UserRole.User = 0)
+            entity.Property(e => e.Role)
+                .HasConversion<int>();
+            entity.HasIndex(e => e.Role);
         });
 
         // UserAnalyticsResponse configuration

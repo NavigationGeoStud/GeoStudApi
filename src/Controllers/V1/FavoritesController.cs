@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using GeoStud.Api.DTOs.Location;
 using GeoStud.Api.Services.Interfaces;
 
@@ -73,17 +74,31 @@ public class FavoritesController : ControllerBase
                 return BadRequest(ModelState);
             }
 
-            var clientIdClaim = User.FindFirst("client_id")?.Value;
+            // Try multiple ways to get client_id claim
+            var clientIdClaim = User.FindFirst("client_id")?.Value 
+                ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value;
+
+            // Log all available claims for debugging
+            var allClaims = User.Claims.Select(c => $"{c.Type}={c.Value}").ToList();
+            _logger.LogDebug("Available claims: {Claims}", string.Join(", ", allClaims));
+
             if (string.IsNullOrEmpty(clientIdClaim))
             {
-                return Unauthorized("Invalid service token");
+                _logger.LogWarning("client_id claim not found in token. Available claims: {Claims}", string.Join(", ", allClaims));
+                return Unauthorized("Invalid service token: client_id claim not found");
             }
+
+            _logger.LogDebug("Found client_id: {ClientId}", clientIdClaim);
 
             var userId = await _favoritesService.GetUserIdFromClientIdAsync(clientIdClaim);
             if (userId == null)
             {
-                return Unauthorized("Invalid service token");
+                _logger.LogWarning("User not found for client_id: {ClientId}", clientIdClaim);
+                return Unauthorized($"Invalid service token: user not found for client_id '{clientIdClaim}'");
             }
+
+            _logger.LogDebug("Found user ID: {UserId} for client_id: {ClientId}", userId.Value, clientIdClaim);
 
             var response = await _favoritesService.AddFavoriteAsync(userId.Value, request);
             return CreatedAtAction(nameof(GetFavorite), new { id = response.Id }, response);

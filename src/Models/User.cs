@@ -55,6 +55,9 @@ public class User : BaseEntity
     public bool IsActive { get; set; } = true;
     public DateTime? LastLoginAt { get; set; }
     
+    [Required]
+    public UserRole Role { get; set; } = UserRole.User;
+    
     // Navigation properties
     public virtual ICollection<UserAnalyticsResponse> Responses { get; set; } = new List<UserAnalyticsResponse>();
     public virtual ICollection<FavoriteLocation> FavoriteLocations { get; set; } = new List<FavoriteLocation>();

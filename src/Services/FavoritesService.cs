@@ -20,16 +20,53 @@ public class FavoritesService : IFavoritesService
     public async Task<int?> GetUserIdFromClientIdAsync(string clientId)
     {
         var username = $"service_{clientId}";
+        _logger.LogDebug("Looking up user with username: {Username}", username);
+        
         var user = await _context.Users
             .FirstOrDefaultAsync(s => s.Username == username);
+
+        if (user == null)
+        {
+            _logger.LogWarning("User not found with username: {Username}. Checking if any users exist with service_ prefix...", username);
+            var serviceUsers = await _context.Users
+                .Where(u => u.Username.StartsWith("service_"))
+                .Select(u => u.Username)
+                .ToListAsync();
+            _logger.LogDebug("Found service users: {Users}", string.Join(", ", serviceUsers));
+        }
+        else
+        {
+            _logger.LogDebug("Found user ID: {UserId} for username: {Username}", user.Id, username);
+        }
 
         return user?.Id;
     }
 
     public async Task<int?> GetUserIdFromTelegramIdAsync(long telegramId)
     {
+        _logger.LogDebug("Looking up user with TelegramId: {TelegramId}", telegramId);
+        
         var user = await _context.Users
-            .FirstOrDefaultAsync(s => s.TelegramId == telegramId);
+            .FirstOrDefaultAsync(s => s.TelegramId == telegramId && !s.IsDeleted);
+
+        if (user == null)
+        {
+            _logger.LogWarning("User not found with TelegramId: {TelegramId}. Checking if any users exist...", telegramId);
+            var allUsers = await _context.Users
+                .Where(u => !u.IsDeleted)
+                .Select(u => new { u.Id, u.TelegramId, u.Username })
+                .ToListAsync();
+            _logger.LogDebug("Found {Count} users in database", allUsers.Count);
+            if (allUsers.Any())
+            {
+                var userList = string.Join(", ", allUsers.Select(u => $"Id={u.Id}, TelegramId={u.TelegramId}, Username={u.Username}"));
+                _logger.LogDebug("Users in database: {Users}", userList);
+            }
+        }
+        else
+        {
+            _logger.LogDebug("Found user ID: {UserId} for TelegramId: {TelegramId}", user.Id, telegramId);
+        }
 
         return user?.Id;
     }
@@ -47,14 +84,19 @@ public class FavoritesService : IFavoritesService
 
     public async Task<FavoriteLocationResponse> AddFavoriteAsync(int userId, FavoriteLocationRequest request)
     {
+        _logger.LogDebug("AddFavoriteAsync called for userId: {UserId}, LocationId: {LocationId}", userId, request.LocationId);
+
         // Check if location exists
         var location = await _context.Locations
             .FirstOrDefaultAsync(l => l.Id == request.LocationId && !l.IsDeleted);
 
         if (location == null)
         {
+            _logger.LogWarning("Location {LocationId} not found", request.LocationId);
             throw new ArgumentException("Location not found", nameof(request));
         }
+
+        _logger.LogDebug("Location {LocationId} found: {LocationName}", location.Id, location.Name);
 
         // Check if already in favorites
         var existingFavorite = await _context.FavoriteLocations
@@ -62,6 +104,7 @@ public class FavoritesService : IFavoritesService
 
         if (existingFavorite != null)
         {
+            _logger.LogWarning("Location {LocationId} is already in favorites for user {UserId}", request.LocationId, userId);
             throw new InvalidOperationException("Location is already in favorites");
         }
 
@@ -70,16 +113,29 @@ public class FavoritesService : IFavoritesService
         {
             UserId = userId,
             LocationId = request.LocationId,
-            Notes = request.Notes
         };
 
+        _logger.LogDebug("Creating FavoriteLocation: UserId={UserId}, LocationId={LocationId}", favorite.UserId, favorite.LocationId);
+
         _context.FavoriteLocations.Add(favorite);
-        await _context.SaveChangesAsync();
+        
+        try
+        {
+            var savedCount = await _context.SaveChangesAsync();
+            _logger.LogInformation("Saved {Count} changes to database. FavoriteLocation Id: {FavoriteId}", savedCount, favorite.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error saving FavoriteLocation to database");
+            throw;
+        }
 
         // Reload with location
         await _context.Entry(favorite)
             .Reference(f => f.Location)
             .LoadAsync();
+
+        _logger.LogDebug("FavoriteLocation {FavoriteId} created successfully for user {UserId}", favorite.Id, userId);
 
         return ToFavoriteLocationResponse(favorite);
     }
@@ -109,7 +165,6 @@ public class FavoritesService : IFavoritesService
             throw new ArgumentException("Favorite location not found", nameof(id));
         }
 
-        favorite.Notes = request.Notes;
         await _context.SaveChangesAsync();
 
         return ToFavoriteLocationResponse(favorite);

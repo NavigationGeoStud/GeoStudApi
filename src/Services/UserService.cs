@@ -498,6 +498,7 @@ public class UserService : IUserService
             Budget = user.Budget,
             ActivityTime = user.ActivityTime,
             SocialPreference = user.SocialPreference,
+            Role = user.Role,
             CreatedAt = user.CreatedAt
         };
     }

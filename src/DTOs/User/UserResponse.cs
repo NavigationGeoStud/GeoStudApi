@@ -1,3 +1,5 @@
+using GeoStud.Api.Models;
+
 namespace GeoStud.Api.DTOs.User;
 
 public class UserResponse
@@ -15,5 +17,6 @@ public class UserResponse
     public string Budget { get; set; } = string.Empty;
     public string ActivityTime { get; set; } = string.Empty;
     public string SocialPreference { get; set; } = string.Empty;
+    public UserRole Role { get; set; }
     public DateTime CreatedAt { get; set; }
 }
