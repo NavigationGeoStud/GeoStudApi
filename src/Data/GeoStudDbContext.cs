@@ -17,6 +17,11 @@ public class GeoStudDbContext : DbContext
     public DbSet<UserAnalyticsResponse> UserAnalyticsResponses { get; set; }
     public DbSet<AnalyticsData> AnalyticsData { get; set; }
     public DbSet<FavoriteLocation> FavoriteLocations { get; set; }
+    public DbSet<UserLike> UserLikes { get; set; }
+    public DbSet<UserDislike> UserDislikes { get; set; }
+    public DbSet<Match> Matches { get; set; }
+    public DbSet<Notification> Notifications { get; set; }
+    public DbSet<LocationSuggestion> LocationSuggestions { get; set; }
     
     // Location entities
     public DbSet<Location> Locations { get; set; }
@@ -145,12 +150,96 @@ public class GeoStudDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // UserLike configuration
+        modelBuilder.Entity<UserLike>(entity =>
+        {
+            entity.HasIndex(e => new { e.UserId, e.TargetUserId }).IsUnique();
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.TargetUserId);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.TargetUser)
+                .WithMany()
+                .HasForeignKey(e => e.TargetUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // UserDislike configuration
+        modelBuilder.Entity<UserDislike>(entity =>
+        {
+            entity.HasIndex(e => new { e.UserId, e.TargetUserId }).IsUnique();
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.TargetUserId);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.TargetUser)
+                .WithMany()
+                .HasForeignKey(e => e.TargetUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Match configuration
+        modelBuilder.Entity<Match>(entity =>
+        {
+            entity.HasIndex(e => new { e.UserId1, e.UserId2 }).IsUnique();
+            entity.HasIndex(e => e.UserId1);
+            entity.HasIndex(e => e.UserId2);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.HasOne(e => e.User1)
+                .WithMany()
+                .HasForeignKey(e => e.UserId1)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.User2)
+                .WithMany()
+                .HasForeignKey(e => e.UserId2)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Notification configuration
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.HasIndex(e => e.TelegramId);
+            entity.HasIndex(e => new { e.TelegramId, e.IsRead });
+            entity.HasIndex(e => e.CreatedAt);
+            entity.HasIndex(e => e.Type);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.HasOne(e => e.Location)
+                .WithMany()
+                .HasForeignKey(e => e.LocationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // LocationSuggestion configuration
+        modelBuilder.Entity<LocationSuggestion>(entity =>
+        {
+            entity.HasIndex(e => new { e.TelegramId, e.LocationId }).IsUnique();
+            entity.HasIndex(e => e.TelegramId);
+            entity.HasIndex(e => e.LocationId);
+            entity.HasIndex(e => e.Status);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.HasOne(e => e.Location)
+                .WithMany()
+                .HasForeignKey(e => e.LocationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         // Global query filters for soft delete
         modelBuilder.Entity<ServiceClient>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<User>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<UserAnalyticsResponse>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<AnalyticsData>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<FavoriteLocation>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<UserLike>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<UserDislike>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<Match>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<Notification>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<LocationSuggestion>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<Location>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<LocationCategory>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<LocationSubcategory>().HasQueryFilter(e => !e.IsDeleted);

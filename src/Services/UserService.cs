@@ -87,7 +87,9 @@ public class UserService : IUserService
         // Create individual responses for analytics
         await CreateUserResponses(user.Id, request);
 
-        return ToUserResponse(user, request.Interests);
+        var interests = DeserializeInterests(user.Interests);
+        var profilePhotos = DeserializeProfilePhotos(user.ProfilePhotos);
+        return ToUserResponse(user, interests, profilePhotos);
     }
 
     public async Task<UserResponseDto?> GetUserByIdAsync(int id)
@@ -101,7 +103,8 @@ public class UserService : IUserService
         }
 
         var interests = DeserializeInterests(user.Interests);
-        return ToUserResponse(user, interests);
+        var profilePhotos = DeserializeProfilePhotos(user.ProfilePhotos);
+        return ToUserResponse(user, interests, profilePhotos);
     }
 
     public async Task<IEnumerable<UserResponseDto>> GetAllUsersAsync()
@@ -114,7 +117,8 @@ public class UserService : IUserService
         return users.Select(s =>
         {
             var interests = DeserializeInterests(s.Interests);
-            return ToUserResponse(s, interests);
+            var profilePhotos = DeserializeProfilePhotos(s.ProfilePhotos);
+            return ToUserResponse(s, interests, profilePhotos);
         }).ToList();
     }
 
@@ -130,7 +134,8 @@ public class UserService : IUserService
         }
 
         var interests = DeserializeInterests(user.Interests);
-        return ToUserResponse(user, interests);
+        var profilePhotos = DeserializeProfilePhotos(user.ProfilePhotos);
+        return ToUserResponse(user, interests, profilePhotos);
     }
 
     public async Task<UserResponseDto?> GetUserByTelegramIdAsync(long telegramId)
@@ -144,7 +149,8 @@ public class UserService : IUserService
         }
 
         var interests = DeserializeInterests(user.Interests);
-        return ToUserResponse(user, interests);
+        var profilePhotos = DeserializeProfilePhotos(user.ProfilePhotos);
+        return ToUserResponse(user, interests, profilePhotos);
     }
 
     public async Task<UserResponseDto> UpdateUserAsync(string clientId, UpdateUserRequest request)
@@ -231,6 +237,28 @@ public class UserService : IUserService
             hasChanges = true;
         }
 
+        if (request.ProfileDescription != null && user.ProfileDescription != request.ProfileDescription)
+        {
+            user.ProfileDescription = request.ProfileDescription;
+            hasChanges = true;
+        }
+
+        if (request.ProfilePhotos != null)
+        {
+            // Validate max 5 photos
+            if (request.ProfilePhotos.Count > 5)
+            {
+                throw new ArgumentException("Maximum 5 profile photos allowed", nameof(request.ProfilePhotos));
+            }
+
+            var newProfilePhotosJson = JsonSerializer.Serialize(request.ProfilePhotos);
+            if (user.ProfilePhotos != newProfilePhotosJson)
+            {
+                user.ProfilePhotos = newProfilePhotosJson;
+                hasChanges = true;
+            }
+        }
+
         if (hasChanges)
         {
             user.UpdatedAt = DateTime.UtcNow;
@@ -241,7 +269,127 @@ public class UserService : IUserService
         }
 
         var interests = DeserializeInterests(user.Interests);
-        return ToUserResponse(user, interests);
+        var profilePhotos = DeserializeProfilePhotos(user.ProfilePhotos);
+        return ToUserResponse(user, interests, profilePhotos);
+    }
+
+    public async Task<UserResponseDto> UpdateUserByTelegramIdAsync(long telegramId, UpdateUserRequest request)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(s => s.TelegramId == telegramId && !s.IsDeleted);
+
+        if (user == null)
+        {
+            throw new ArgumentException("User not found", nameof(telegramId));
+        }
+
+        // Update only provided fields
+        bool hasChanges = false;
+
+        if (!string.IsNullOrEmpty(request.Username) && user.Username != request.Username)
+        {
+            user.Username = request.Username;
+            hasChanges = true;
+        }
+
+        if (request.FirstName != null && user.FirstName != request.FirstName)
+        {
+            user.FirstName = request.FirstName;
+            hasChanges = true;
+        }
+
+        if (request.TelegramId.HasValue && user.TelegramId != request.TelegramId)
+        {
+            user.TelegramId = request.TelegramId;
+            hasChanges = true;
+        }
+
+        if (!string.IsNullOrEmpty(request.AgeRange) && user.AgeRange != request.AgeRange)
+        {
+            user.AgeRange = request.AgeRange;
+            hasChanges = true;
+        }
+
+        if (request.IsStudent.HasValue && user.IsStudent != request.IsStudent.Value)
+        {
+            user.IsStudent = request.IsStudent.Value;
+            hasChanges = true;
+        }
+
+        if (!string.IsNullOrEmpty(request.Gender) && user.Gender != request.Gender)
+        {
+            user.Gender = request.Gender;
+            hasChanges = true;
+        }
+
+        if (request.IsLocal.HasValue && user.IsLocal != request.IsLocal.Value)
+        {
+            user.IsLocal = request.IsLocal.Value;
+            hasChanges = true;
+        }
+
+        if (request.Interests != null)
+        {
+            var newInterestsJson = JsonSerializer.Serialize(request.Interests);
+            if (user.Interests != newInterestsJson)
+            {
+                user.Interests = newInterestsJson;
+                hasChanges = true;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(request.Budget) && user.Budget != request.Budget)
+        {
+            user.Budget = request.Budget;
+            hasChanges = true;
+        }
+
+        if (!string.IsNullOrEmpty(request.ActivityTime) && user.ActivityTime != request.ActivityTime)
+        {
+            user.ActivityTime = request.ActivityTime;
+            hasChanges = true;
+        }
+
+        if (!string.IsNullOrEmpty(request.SocialPreference) && user.SocialPreference != request.SocialPreference)
+        {
+            user.SocialPreference = request.SocialPreference;
+            hasChanges = true;
+        }
+
+        if (request.ProfileDescription != null && user.ProfileDescription != request.ProfileDescription)
+        {
+            user.ProfileDescription = request.ProfileDescription;
+            hasChanges = true;
+        }
+
+        if (request.ProfilePhotos != null)
+        {
+            // Validate max 5 photos
+            if (request.ProfilePhotos.Count > 5)
+            {
+                throw new ArgumentException("Maximum 5 profile photos allowed", nameof(request.ProfilePhotos));
+            }
+
+            var newProfilePhotosJson = JsonSerializer.Serialize(request.ProfilePhotos);
+            if (user.ProfilePhotos != newProfilePhotosJson)
+            {
+                user.ProfilePhotos = newProfilePhotosJson;
+                hasChanges = true;
+            }
+        }
+
+        if (hasChanges)
+        {
+            user.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            // Update analytics responses
+            await UpdateUserResponses(user.Id, request);
+        }
+
+        var interests = DeserializeInterests(user.Interests);
+        var profilePhotos = DeserializeProfilePhotos(user.ProfilePhotos);
+        return ToUserResponse(user, interests, profilePhotos);
     }
 
     public async Task<UserResponseDto> UpdateUserFullAsync(string clientId, UserRequest request)
@@ -282,7 +430,9 @@ public class UserService : IUserService
             SocialPreference = request.SocialPreference
         });
 
-        return ToUserResponse(user, request.Interests);
+        var interests = DeserializeInterests(user.Interests);
+        var profilePhotos = DeserializeProfilePhotos(user.ProfilePhotos);
+        return ToUserResponse(user, interests, profilePhotos);
     }
 
     private async Task CreateUserResponses(int userId, UserRequest request)
@@ -481,7 +631,7 @@ public class UserService : IUserService
         await _context.SaveChangesAsync();
     }
 
-    private static UserResponseDto ToUserResponse(User user, List<string> interests)
+    private static UserResponseDto ToUserResponse(User user, List<string> interests, List<string> profilePhotos)
     {
         return new UserResponseDto
         {
@@ -499,7 +649,10 @@ public class UserService : IUserService
             ActivityTime = user.ActivityTime,
             SocialPreference = user.SocialPreference,
             Role = user.Role,
-            CreatedAt = user.CreatedAt
+            ProfileDescription = user.ProfileDescription,
+            ProfilePhotos = profilePhotos,
+            CreatedAt = user.CreatedAt,
+            UpdatedAt = user.UpdatedAt ?? user.CreatedAt
         };
     }
 
@@ -508,6 +661,13 @@ public class UserService : IUserService
         return string.IsNullOrEmpty(interestsJson) 
             ? new List<string>() 
             : JsonSerializer.Deserialize<List<string>>(interestsJson) ?? new List<string>();
+    }
+
+    private static List<string> DeserializeProfilePhotos(string? profilePhotosJson)
+    {
+        return string.IsNullOrEmpty(profilePhotosJson) 
+            ? new List<string>() 
+            : JsonSerializer.Deserialize<List<string>>(profilePhotosJson) ?? new List<string>();
     }
 }
 

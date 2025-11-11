@@ -3,6 +3,7 @@ using System;
 using GeoStud.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GeoStud.Api.Migrations
 {
     [DbContext(typeof(GeoStudDbContext))]
-    partial class GeoStudDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251111143953_AddNotificationsAndLocationSuggestions")]
+    partial class AddNotificationsAndLocationSuggestions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.0");
@@ -423,10 +426,6 @@ namespace GeoStud.Api.Migrations
                     b.Property<int?>("LocationId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("Message")
-                        .HasMaxLength(500)
-                        .HasColumnType("TEXT");
-
                     b.Property<long>("TelegramId")
                         .HasColumnType("INTEGER");
 
@@ -573,14 +572,6 @@ namespace GeoStud.Api.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ProfileDescription")
-                        .HasMaxLength(500)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ProfilePhotos")
-                        .HasMaxLength(1000)
-                        .HasColumnType("TEXT");
-
                     b.Property<int>("Role")
                         .HasColumnType("INTEGER");
 
@@ -716,10 +707,6 @@ namespace GeoStud.Api.Migrations
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
-
-                    b.Property<string>("Message")
-                        .HasMaxLength(500)
-                        .HasColumnType("TEXT");
 
                     b.Property<int>("TargetUserId")
                         .HasColumnType("INTEGER");

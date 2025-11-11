@@ -18,5 +18,8 @@ public class UserResponse
     public string ActivityTime { get; set; } = string.Empty;
     public string SocialPreference { get; set; } = string.Empty;
     public UserRole Role { get; set; }
+    public string? ProfileDescription { get; set; }
+    public List<string> ProfilePhotos { get; set; } = new();
     public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
 }

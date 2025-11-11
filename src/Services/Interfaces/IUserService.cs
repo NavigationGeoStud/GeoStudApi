@@ -11,6 +11,7 @@ public interface IUserService
     Task<UserResponseDto?> GetCurrentUserAsync(string clientId);
     Task<UserResponseDto?> GetUserByTelegramIdAsync(long telegramId);
     Task<UserResponseDto> UpdateUserAsync(string clientId, UpdateUserRequest request);
+    Task<UserResponseDto> UpdateUserByTelegramIdAsync(long telegramId, UpdateUserRequest request);
     Task<UserResponseDto> UpdateUserFullAsync(string clientId, UserRequest request);
 }
 
