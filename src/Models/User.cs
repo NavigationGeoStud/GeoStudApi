@@ -58,6 +58,13 @@ public class User : BaseEntity
     [Required]
     public UserRole Role { get; set; } = UserRole.User;
     
+    // Profile fields for people search
+    [MaxLength(500)]
+    public string? ProfileDescription { get; set; }
+    
+    [MaxLength(1000)]
+    public string? ProfilePhotos { get; set; } // JSON array of file_id strings (max 5 photos)
+    
     // Navigation properties
     public virtual ICollection<UserAnalyticsResponse> Responses { get; set; } = new List<UserAnalyticsResponse>();
     public virtual ICollection<FavoriteLocation> FavoriteLocations { get; set; } = new List<FavoriteLocation>();

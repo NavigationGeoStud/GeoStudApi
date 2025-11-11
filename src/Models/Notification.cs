@@ -19,6 +19,9 @@ public class Notification : BaseEntity
     
     public int? LocationId { get; set; } // Для location_suggestion
     
+    [MaxLength(500)]
+    public string? Message { get; set; } // Сообщение для like уведомлений
+    
     // Navigation properties
     [ForeignKey(nameof(LocationId))]
     public virtual Location? Location { get; set; }

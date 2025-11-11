@@ -35,4 +35,9 @@ public class UpdateUserRequest
     
     [MaxLength(50)]
     public string? SocialPreference { get; set; }
+    
+    [MaxLength(500)]
+    public string? ProfileDescription { get; set; }
+    
+    public List<string>? ProfilePhotos { get; set; } // Максимум 5 фотографий
 }

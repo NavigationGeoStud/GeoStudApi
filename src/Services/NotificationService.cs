@@ -11,11 +11,16 @@ namespace GeoStud.Api.Services;
 public class NotificationService : INotificationService
 {
     private readonly GeoStudDbContext _context;
+    private readonly IWebhookService _webhookService;
     private readonly ILogger<NotificationService> _logger;
 
-    public NotificationService(GeoStudDbContext context, ILogger<NotificationService> logger)
+    public NotificationService(
+        GeoStudDbContext context, 
+        IWebhookService webhookService,
+        ILogger<NotificationService> logger)
     {
         _context = context;
+        _webhookService = webhookService;
         _logger = logger;
     }
 
@@ -39,60 +44,14 @@ public class NotificationService : INotificationService
 
         var result = new List<NotificationResponse>();
 
-        foreach (var notification in notifications)
-        {
-            var response = new NotificationResponse
+            foreach (var notification in notifications)
             {
-                Id = notification.Id,
-                Type = notification.Type,
-                IsRead = notification.IsRead,
-                CreatedAt = notification.CreatedAt
-            };
-
-            // Load fromUser for like and match notifications
-            if ((notification.Type == "like" || notification.Type == "match") && notification.FromTelegramId.HasValue)
-            {
-                var fromUser = await _context.Users
-                    .FirstOrDefaultAsync(u => u.TelegramId == notification.FromTelegramId.Value && !u.IsDeleted);
-
-                if (fromUser != null)
+                var response = await GetNotificationResponseAsync(notification);
+                if (response != null)
                 {
-                    var interests = DeserializeInterests(fromUser.Interests);
-                    response.FromUser = new UserProfileResponse
-                    {
-                        TelegramId = fromUser.TelegramId ?? 0,
-                        Username = fromUser.Username,
-                        FirstName = fromUser.FirstName,
-                        AgeRange = fromUser.AgeRange,
-                        Gender = fromUser.Gender,
-                        IsStudent = fromUser.IsStudent,
-                        Interests = interests
-                    };
+                    result.Add(response);
                 }
             }
-
-            // Load location for location_suggestion notifications
-            if (notification.Type == "location_suggestion" && notification.LocationId.HasValue)
-            {
-                var location = await _context.Locations
-                    .FirstOrDefaultAsync(l => l.Id == notification.LocationId.Value && !l.IsDeleted);
-
-                if (location != null)
-                {
-                    response.Location = new NotificationResponse.NotificationLocationInfo
-                    {
-                        Id = location.Id,
-                        Name = location.Name,
-                        Description = location.Description,
-                        Address = location.Address,
-                        City = location.City,
-                        CategoryId = location.CategoryId
-                    };
-                }
-            }
-
-            result.Add(response);
-        }
 
         return result;
     }
@@ -119,16 +78,17 @@ public class NotificationService : INotificationService
         return true;
     }
 
-    public async Task<NotificationResponse?> CreateLikeNotificationAsync(long toTelegramId, long fromTelegramId)
+    public async Task<NotificationResponse?> CreateLikeNotificationAsync(long toTelegramId, long fromTelegramId, string? message = null)
     {
-        _logger.LogDebug("CreateLikeNotificationAsync: toTelegramId={ToTelegramId}, fromTelegramId={FromTelegramId}", 
-            toTelegramId, fromTelegramId);
+        _logger.LogDebug("CreateLikeNotificationAsync: toTelegramId={ToTelegramId}, fromTelegramId={FromTelegramId}, message={Message}", 
+            toTelegramId, fromTelegramId, message);
 
         var notification = new Notification
         {
             TelegramId = toTelegramId,
             Type = "like",
             FromTelegramId = fromTelegramId,
+            Message = message,
             IsRead = false
         };
 
@@ -137,8 +97,26 @@ public class NotificationService : INotificationService
 
         _logger.LogInformation("Like notification created: Id={NotificationId}", notification.Id);
 
-        // Return notification response
-        return await GetNotificationResponseAsync(notification);
+        // Get notification response
+        var notificationResponse = await GetNotificationResponseAsync(notification);
+
+        // Send webhook notification (fire and forget)
+        if (notificationResponse != null)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _webhookService.SendNotificationWebhookAsync(toTelegramId, notificationResponse);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to send webhook for like notification {NotificationId}", notification.Id);
+                }
+            });
+        }
+
+        return notificationResponse;
     }
 
     public async Task<NotificationResponse?> CreateMatchNotificationAsync(long toTelegramId, long fromTelegramId)
@@ -159,8 +137,26 @@ public class NotificationService : INotificationService
 
         _logger.LogInformation("Match notification created: Id={NotificationId}", notification.Id);
 
-        // Return notification response
-        return await GetNotificationResponseAsync(notification);
+        // Get notification response
+        var notificationResponse = await GetNotificationResponseAsync(notification);
+
+        // Send webhook notification (fire and forget)
+        if (notificationResponse != null)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _webhookService.SendNotificationWebhookAsync(toTelegramId, notificationResponse);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to send webhook for match notification {NotificationId}", notification.Id);
+                }
+            });
+        }
+
+        return notificationResponse;
     }
 
     public async Task<NotificationResponse?> CreateLocationSuggestionNotificationAsync(long telegramId, int locationId)
@@ -195,8 +191,26 @@ public class NotificationService : INotificationService
 
         _logger.LogInformation("Location suggestion notification created: Id={NotificationId}", notification.Id);
 
-        // Return notification response
-        return await GetNotificationResponseAsync(notification);
+        // Get notification response
+        var notificationResponse = await GetNotificationResponseAsync(notification);
+
+        // Send webhook notification (fire and forget)
+        if (notificationResponse != null)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _webhookService.SendNotificationWebhookAsync(telegramId, notificationResponse);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to send webhook for location suggestion notification {NotificationId}", notification.Id);
+                }
+            });
+        }
+
+        return notificationResponse;
     }
 
     private async Task<NotificationResponse?> GetNotificationResponseAsync(Notification notification)
@@ -206,7 +220,8 @@ public class NotificationService : INotificationService
             Id = notification.Id,
             Type = notification.Type,
             IsRead = notification.IsRead,
-            CreatedAt = notification.CreatedAt
+            CreatedAt = notification.CreatedAt,
+            Message = notification.Message
         };
 
         // Load fromUser for like and match notifications
@@ -218,6 +233,7 @@ public class NotificationService : INotificationService
             if (fromUser != null)
             {
                 var interests = DeserializeInterests(fromUser.Interests);
+                var profilePhotos = DeserializeProfilePhotos(fromUser.ProfilePhotos);
                 response.FromUser = new UserProfileResponse
                 {
                     TelegramId = fromUser.TelegramId ?? 0,
@@ -226,7 +242,9 @@ public class NotificationService : INotificationService
                     AgeRange = fromUser.AgeRange,
                     Gender = fromUser.Gender,
                     IsStudent = fromUser.IsStudent,
-                    Interests = interests
+                    Interests = interests,
+                    ProfileDescription = fromUser.ProfileDescription,
+                    ProfilePhotos = profilePhotos
                 };
             }
         }
@@ -259,6 +277,13 @@ public class NotificationService : INotificationService
         return string.IsNullOrEmpty(interestsJson) 
             ? new List<string>() 
             : JsonSerializer.Deserialize<List<string>>(interestsJson) ?? new List<string>();
+    }
+
+    private static List<string> DeserializeProfilePhotos(string? profilePhotosJson)
+    {
+        return string.IsNullOrEmpty(profilePhotosJson) 
+            ? new List<string>() 
+            : JsonSerializer.Deserialize<List<string>>(profilePhotosJson) ?? new List<string>();
     }
 }
 

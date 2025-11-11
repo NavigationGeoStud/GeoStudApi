@@ -9,5 +9,8 @@ public class LikeRequest
     
     [Required]
     public long TargetTelegramId { get; set; }
+    
+    [MaxLength(500)]
+    public string? Message { get; set; }
 }
 

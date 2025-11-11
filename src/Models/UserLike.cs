@@ -11,6 +11,9 @@ public class UserLike : BaseEntity
     [Required]
     public int TargetUserId { get; set; }
     
+    [MaxLength(500)]
+    public string? Message { get; set; } // Сообщение, отправленное с лайком
+    
     // Navigation properties
     [ForeignKey(nameof(UserId))]
     public virtual User User { get; set; } = null!;

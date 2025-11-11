@@ -6,6 +6,7 @@ using GeoStud.Api.DTOs.User;
 using GeoStud.Api.DTOs.People;
 using GeoStud.Api.DTOs.Notification;
 using UserResponseDto = GeoStud.Api.DTOs.User.UserResponse;
+using MarkNotificationAsReadRequest = GeoStud.Api.DTOs.Notification.MarkNotificationAsReadRequest;
 using GeoStud.Api.Services.Interfaces;
 using RoleCheckResponse = GeoStud.Api.DTOs.User.RoleCheckResponse;
 using AssignRoleRequest = GeoStud.Api.DTOs.User.AssignRoleRequest;
@@ -30,6 +31,7 @@ public class TelegramController : ControllerBase
     private readonly IPeopleService _peopleService;
     private readonly INotificationService _notificationService;
     private readonly ILocationSuggestionService _locationSuggestionService;
+    private readonly IWebhookService _webhookService;
     private readonly ILogger<TelegramController> _logger;
 
     public TelegramController(
@@ -41,6 +43,7 @@ public class TelegramController : ControllerBase
         IPeopleService peopleService,
         INotificationService notificationService,
         ILocationSuggestionService locationSuggestionService,
+        IWebhookService webhookService,
         ILogger<TelegramController> logger)
     {
         _userService = userService;
@@ -51,6 +54,7 @@ public class TelegramController : ControllerBase
         _peopleService = peopleService;
         _notificationService = notificationService;
         _locationSuggestionService = locationSuggestionService;
+        _webhookService = webhookService;
         _logger = logger;
     }
 
@@ -91,7 +95,7 @@ public class TelegramController : ControllerBase
     /// <summary>
     /// Update user for telegram user (partial update)
     /// </summary>
-    /// <param name="request">User data to update (all fields optional)</param>
+    /// <param name="request">User data to update (all fields optional, must include telegramId)</param>
     /// <returns>Updated user response</returns>
     [HttpPut("user")]
     [ProducesResponseType(typeof(UserResponseDto), StatusCodes.Status200OK)]
@@ -113,7 +117,13 @@ public class TelegramController : ControllerBase
                 return Unauthorized("Invalid service token");
             }
 
-            var response = await _userService.UpdateUserAsync(clientIdClaim, request);
+            // For Telegram users, update by telegramId from request
+            if (!request.TelegramId.HasValue)
+            {
+                return BadRequest(new { error = "telegramId is required" });
+            }
+
+            var response = await _userService.UpdateUserByTelegramIdAsync(request.TelegramId.Value, request);
             return Ok(response);
         }
         catch (ArgumentException ex)
@@ -778,6 +788,47 @@ public class TelegramController : ControllerBase
     }
 
     /// <summary>
+    /// Search people by locations (users with common favorite locations and filled profiles)
+    /// </summary>
+    /// <param name="telegramId">Telegram user ID</param>
+    /// <param name="page">Page number (default: 1)</param>
+    /// <param name="pageSize">Page size (default: 20)</param>
+    /// <returns>Paginated list of users with common favorite locations and filled profiles</returns>
+    [HttpGet("people/by-locations")]
+    [ProducesResponseType(typeof(PagedResponse<UserProfileWithLocationsResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SearchPeopleByLocations([FromQuery] long telegramId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    {
+        try
+        {
+            if (telegramId == 0)
+            {
+                return BadRequest(new { error = "telegramId query parameter is required and must be a valid Telegram user ID" });
+            }
+
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 20;
+            if (pageSize > 100) pageSize = 100;
+
+            var response = await _peopleService.SearchPeopleByLocationsAsync(telegramId, page, pageSize);
+            
+            if (response.TotalCount == 0)
+            {
+                return NotFound(response);
+            }
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error searching people by locations");
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    /// <summary>
     /// Like a user (swipe right)
     /// </summary>
     /// <param name="request">Like request with telegramId and targetTelegramId</param>
@@ -797,7 +848,7 @@ public class TelegramController : ControllerBase
                 return BadRequest(ModelState);
             }
 
-            var response = await _peopleService.LikeUserAsync(request.TelegramId, request.TargetTelegramId);
+            var response = await _peopleService.LikeUserAsync(request.TelegramId, request.TargetTelegramId, request.Message);
             
             if (response.IsMatch)
             {
@@ -892,29 +943,34 @@ public class TelegramController : ControllerBase
     /// Mark notification as read
     /// </summary>
     /// <param name="notificationId">Notification ID</param>
-    /// <param name="telegramId">Telegram user ID</param>
-    /// <returns>No content</returns>
-    [HttpPut("notifications/{notificationId}/read")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    /// <param name="request">Request with telegramId</param>
+    /// <returns>Success response</returns>
+    [HttpPost("notifications/{notificationId}/read")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> MarkNotificationAsRead(int notificationId, [FromQuery] long telegramId)
+    public async Task<IActionResult> MarkNotificationAsRead(int notificationId, [FromBody] MarkNotificationAsReadRequest request)
     {
         try
         {
-            if (telegramId == 0)
+            if (!ModelState.IsValid)
             {
-                return BadRequest(new { error = "telegramId query parameter is required and must be a valid Telegram user ID" });
+                return BadRequest(ModelState);
             }
 
-            var success = await _notificationService.MarkNotificationAsReadAsync(notificationId, telegramId);
+            if (request.TelegramId == 0)
+            {
+                return BadRequest(new { error = "telegramId is required and must be a valid Telegram user ID" });
+            }
+
+            var success = await _notificationService.MarkNotificationAsReadAsync(notificationId, request.TelegramId);
             if (!success)
             {
                 return NotFound(new { error = "Notification not found" });
             }
 
-            return NoContent();
+            return Ok(new { success = true });
         }
         catch (Exception ex)
         {
@@ -1047,6 +1103,76 @@ public class TelegramController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error rejecting location suggestion");
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    /// <summary>
+    /// Configure webhook URL for notifications
+    /// </summary>
+    /// <param name="request">Webhook configuration request</param>
+    /// <returns>Configuration response</returns>
+    [HttpPost("webhook/configure")]
+    [ProducesResponseType(typeof(ConfigureWebhookResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ConfigureWebhook([FromBody] ConfigureWebhookRequest request)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var success = await _webhookService.ConfigureWebhookAsync(request.WebhookUrl, request.Secret);
+            
+            if (!success)
+            {
+                return BadRequest(new { error = "Invalid webhook URL. Must be a valid HTTP or HTTPS URL." });
+            }
+
+            var response = new ConfigureWebhookResponse
+            {
+                Success = true,
+                Message = "Webhook configured successfully",
+                WebhookUrl = _webhookService.GetWebhookUrl()
+            };
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error configuring webhook");
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    /// <summary>
+    /// Get current webhook configuration
+    /// </summary>
+    /// <returns>Current webhook URL</returns>
+    [HttpGet("webhook")]
+    [ProducesResponseType(typeof(ConfigureWebhookResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public IActionResult GetWebhook()
+    {
+        try
+        {
+            var webhookUrl = _webhookService.GetWebhookUrl();
+            
+            var response = new ConfigureWebhookResponse
+            {
+                Success = true,
+                Message = string.IsNullOrEmpty(webhookUrl) ? "Webhook is not configured" : "Webhook is configured",
+                WebhookUrl = webhookUrl
+            };
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting webhook configuration");
             return StatusCode(500, "Internal server error");
         }
     }

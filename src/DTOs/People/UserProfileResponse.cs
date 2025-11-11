@@ -9,5 +9,7 @@ public class UserProfileResponse
     public string Gender { get; set; } = string.Empty;
     public bool IsStudent { get; set; }
     public List<string> Interests { get; set; } = new();
+    public string? ProfileDescription { get; set; }
+    public List<string> ProfilePhotos { get; set; } = new();
 }
 

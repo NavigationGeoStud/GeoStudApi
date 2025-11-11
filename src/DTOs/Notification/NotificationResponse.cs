@@ -10,6 +10,7 @@ public class NotificationResponse
     public DateTime CreatedAt { get; set; }
     public UserProfileResponse? FromUser { get; set; }
     public NotificationLocationInfo? Location { get; set; }
+    public string? Message { get; set; } // Сообщение для like уведомлений
     
     public class NotificationLocationInfo
     {

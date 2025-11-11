@@ -115,6 +115,8 @@ builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IPeopleService, PeopleService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<ILocationSuggestionService, LocationSuggestionService>();
+builder.Services.AddHttpClient<WebhookService>();
+builder.Services.AddScoped<IWebhookService, WebhookService>();
 
 // Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();

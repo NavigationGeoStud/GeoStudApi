@@ -173,11 +173,16 @@ public class PeopleService : IPeopleService
             .ToList();
 
         // Get all favorite locations for users with common locations
+        // Filter by users with filled profiles (profileDescription and profilePhotos not empty)
         var favoriteLocationsQuery = _context.FavoriteLocations
             .Where(fl => currentUserFavoriteLocationIds.Contains(fl.LocationId) && !fl.IsDeleted)
             .Where(fl => !excludedUserIds.Contains(fl.UserId))
             .Include(fl => fl.User)
-            .Where(fl => fl.User != null && !fl.User.IsDeleted && fl.User.IsActive);
+            .Where(fl => fl.User != null && !fl.User.IsDeleted && fl.User.IsActive)
+            .Where(fl => fl.User!.ProfileDescription != null && 
+                        !string.IsNullOrEmpty(fl.User.ProfileDescription) &&
+                        fl.User.ProfilePhotos != null && 
+                        !string.IsNullOrEmpty(fl.User.ProfilePhotos));
 
         var favoriteLocations = await favoriteLocationsQuery.ToListAsync();
 
@@ -224,6 +229,7 @@ public class PeopleService : IPeopleService
                         {
                             Id = loc.Id,
                             Name = loc.Name,
+                            Address = loc.Address,
                             CategoryId = loc.CategoryId
                         }
                         : null;
@@ -246,15 +252,27 @@ public class PeopleService : IPeopleService
         };
     }
 
-    public async Task<LikeResponse> LikeUserAsync(long telegramId, long targetTelegramId)
+    public async Task<PagedResponse<UserProfileWithLocationsResponse>> SearchPeopleByLocationsAsync(long telegramId, int page = 1, int pageSize = 20)
     {
-        _logger.LogDebug("LikeUserAsync: telegramId={TelegramId}, targetTelegramId={TargetTelegramId}", 
-            telegramId, targetTelegramId);
+        // This is an alias for SearchPeopleAsync to match the API endpoint name
+        return await SearchPeopleAsync(telegramId, page, pageSize);
+    }
+
+    public async Task<LikeResponse> LikeUserAsync(long telegramId, long targetTelegramId, string? message = null)
+    {
+        _logger.LogDebug("LikeUserAsync: telegramId={TelegramId}, targetTelegramId={TargetTelegramId}, message={Message}", 
+            telegramId, targetTelegramId, message);
 
         // Validate users
         if (telegramId == targetTelegramId)
         {
             throw new ArgumentException("Cannot like yourself", nameof(targetTelegramId));
+        }
+
+        // Validate message length
+        if (!string.IsNullOrEmpty(message) && message.Length > 500)
+        {
+            throw new ArgumentException("Message cannot exceed 500 characters", nameof(message));
         }
 
         var currentUser = await _context.Users
@@ -283,51 +301,77 @@ public class PeopleService : IPeopleService
         {
             _logger.LogDebug("User {UserId} already liked user {TargetUserId}", currentUser.Id, targetUser.Id);
             // Check if it's a match
-            var isMatch = await _context.UserLikes
-                .AnyAsync(ul => ul.UserId == targetUser.Id && 
-                               ul.TargetUserId == currentUser.Id && 
-                               !ul.IsDeleted);
+            var reverseLike = await _context.UserLikes
+                .FirstOrDefaultAsync(ul => ul.UserId == targetUser.Id && 
+                                          ul.TargetUserId == currentUser.Id && 
+                                          !ul.IsDeleted);
+            
+            if (reverseLike != null)
+            {
+                // It's a match, get match info
+                var match = await _context.Matches
+                    .FirstOrDefaultAsync(m => 
+                        ((m.UserId1 == Math.Min(currentUser.Id, targetUser.Id) && 
+                          m.UserId2 == Math.Max(currentUser.Id, targetUser.Id)) ||
+                         (m.UserId1 == Math.Max(currentUser.Id, targetUser.Id) && 
+                          m.UserId2 == Math.Min(currentUser.Id, targetUser.Id))) &&
+                        !m.IsDeleted);
+
+                if (match != null)
+                {
+                    return new LikeResponse
+                    {
+                        Success = true,
+                        IsMatch = true,
+                        Match = new LikeResponse.MatchInfo
+                        {
+                            Id = match.Id,
+                            CreatedAt = match.CreatedAt,
+                            User1 = new LikeResponse.UserInfo
+                            {
+                                TelegramId = currentUser.TelegramId ?? 0,
+                                Username = currentUser.Username,
+                                FirstName = currentUser.FirstName
+                            },
+                            User2 = new LikeResponse.UserInfo
+                            {
+                                TelegramId = targetUser.TelegramId ?? 0,
+                                Username = targetUser.Username,
+                                FirstName = targetUser.FirstName
+                            }
+                        }
+                    };
+                }
+            }
             
             return new LikeResponse
             {
                 Success = true,
-                IsMatch = isMatch,
-                MatchMessage = isMatch ? "У вас взаимная симпатия! ❤️" : null
+                IsMatch = false
             };
         }
+
+        // Check if it's a mutual like BEFORE creating the like
+        // This is the key: if target user already liked current user, it's a match, not a like notification
+        var reverseLikeExists = await _context.UserLikes
+            .FirstOrDefaultAsync(ul => ul.UserId == targetUser.Id && 
+                                      ul.TargetUserId == currentUser.Id && 
+                                      !ul.IsDeleted);
 
         // Create like
         var like = new UserLike
         {
             UserId = currentUser.Id,
-            TargetUserId = targetUser.Id
+            TargetUserId = targetUser.Id,
+            Message = message
         };
 
         _context.UserLikes.Add(like);
         await _context.SaveChangesAsync();
 
-        // Create like notification for target user
-        try
+        if (reverseLikeExists != null)
         {
-            await _notificationService.CreateLikeNotificationAsync(
-                targetTelegramId, 
-                telegramId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to create like notification");
-            // Don't fail the like operation if notification creation fails
-        }
-
-        // Check if it's a match (target user also liked current user)
-        var isMutualLike = await _context.UserLikes
-            .AnyAsync(ul => ul.UserId == targetUser.Id && 
-                           ul.TargetUserId == currentUser.Id && 
-                           !ul.IsDeleted);
-
-        if (isMutualLike)
-        {
-            // Create match
+            // It's a mutual like - create match and match notifications, NOT like notification
             var match = new Match
             {
                 UserId1 = Math.Min(currentUser.Id, targetUser.Id),
@@ -348,7 +392,7 @@ public class PeopleService : IPeopleService
                 _logger.LogInformation("Match created between users {UserId1} and {UserId2}", 
                     currentUser.Id, targetUser.Id);
 
-                // Create match notifications for both users
+                // Create match notifications for both users (NOT like notification)
                 try
                 {
                     await _notificationService.CreateMatchNotificationAsync(
@@ -365,12 +409,51 @@ public class PeopleService : IPeopleService
                 }
             }
 
+            // Get the match for response
+            var createdMatch = await _context.Matches
+                .FirstOrDefaultAsync(m => 
+                    ((m.UserId1 == match.UserId1 && m.UserId2 == match.UserId2) ||
+                     (m.UserId1 == match.UserId2 && m.UserId2 == match.UserId1)) &&
+                    !m.IsDeleted);
+
             return new LikeResponse
             {
                 Success = true,
                 IsMatch = true,
-                MatchMessage = "У вас взаимная симпатия! ❤️"
+                Match = createdMatch != null ? new LikeResponse.MatchInfo
+                {
+                    Id = createdMatch.Id,
+                    CreatedAt = createdMatch.CreatedAt,
+                    User1 = new LikeResponse.UserInfo
+                    {
+                        TelegramId = currentUser.TelegramId ?? 0,
+                        Username = currentUser.Username,
+                        FirstName = currentUser.FirstName
+                    },
+                    User2 = new LikeResponse.UserInfo
+                    {
+                        TelegramId = targetUser.TelegramId ?? 0,
+                        Username = targetUser.Username,
+                        FirstName = targetUser.FirstName
+                    }
+                } : null
             };
+        }
+        else
+        {
+            // Not a mutual like - create like notification (with message if provided)
+            try
+            {
+                await _notificationService.CreateLikeNotificationAsync(
+                    targetTelegramId, 
+                    telegramId,
+                    message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to create like notification");
+                // Don't fail the like operation if notification creation fails
+            }
         }
 
         return new LikeResponse
@@ -435,6 +518,7 @@ public class PeopleService : IPeopleService
     private static UserProfileResponse ToUserProfileResponse(User user)
     {
         var interests = DeserializeInterests(user.Interests);
+        var profilePhotos = DeserializeProfilePhotos(user.ProfilePhotos);
         
         return new UserProfileResponse
         {
@@ -444,13 +528,16 @@ public class PeopleService : IPeopleService
             AgeRange = user.AgeRange,
             Gender = user.Gender,
             IsStudent = user.IsStudent,
-            Interests = interests
+            Interests = interests,
+            ProfileDescription = user.ProfileDescription,
+            ProfilePhotos = profilePhotos
         };
     }
 
     private static UserProfileWithLocationsResponse ToUserProfileWithLocationsResponse(User user)
     {
         var interests = DeserializeInterests(user.Interests);
+        var profilePhotos = DeserializeProfilePhotos(user.ProfilePhotos);
         
         return new UserProfileWithLocationsResponse
         {
@@ -461,6 +548,8 @@ public class PeopleService : IPeopleService
             Gender = user.Gender,
             IsStudent = user.IsStudent,
             Interests = interests,
+            ProfileDescription = user.ProfileDescription,
+            ProfilePhotos = profilePhotos,
             MatchingLocations = new List<UserProfileWithLocationsResponse.LocationInfo>()
         };
     }
@@ -470,6 +559,13 @@ public class PeopleService : IPeopleService
         return string.IsNullOrEmpty(interestsJson) 
             ? new List<string>() 
             : JsonSerializer.Deserialize<List<string>>(interestsJson) ?? new List<string>();
+    }
+
+    private static List<string> DeserializeProfilePhotos(string? profilePhotosJson)
+    {
+        return string.IsNullOrEmpty(profilePhotosJson) 
+            ? new List<string>() 
+            : JsonSerializer.Deserialize<List<string>>(profilePhotosJson) ?? new List<string>();
     }
 }
 
