@@ -3,6 +3,7 @@ using System;
 using GeoStud.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GeoStud.Api.Migrations
 {
     [DbContext(typeof(GeoStudDbContext))]
-    partial class GeoStudDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251111132200_AddPeopleSearchTables")]
+    partial class AddPeopleSearchTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.0");
@@ -323,48 +326,6 @@ namespace GeoStud.Api.Migrations
                     b.ToTable("LocationSubcategoryJoins");
                 });
 
-            modelBuilder.Entity("GeoStud.Api.Models.LocationSuggestion", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
-                        .HasDefaultValueSql("GETUTCDATE()");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("LocationId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("TEXT");
-
-                    b.Property<long>("TelegramId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("LocationId");
-
-                    b.HasIndex("Status");
-
-                    b.HasIndex("TelegramId");
-
-                    b.HasIndex("TelegramId", "LocationId")
-                        .IsUnique();
-
-                    b.ToTable("LocationSuggestions");
-                });
-
             modelBuilder.Entity("GeoStud.Api.Models.Match", b =>
                 {
                     b.Property<int>("Id")
@@ -398,55 +359,6 @@ namespace GeoStud.Api.Migrations
                         .IsUnique();
 
                     b.ToTable("Matches");
-                });
-
-            modelBuilder.Entity("GeoStud.Api.Models.Notification", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
-                        .HasDefaultValueSql("GETUTCDATE()");
-
-                    b.Property<long?>("FromTelegramId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("IsRead")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("LocationId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<long>("TelegramId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedAt");
-
-                    b.HasIndex("LocationId");
-
-                    b.HasIndex("TelegramId");
-
-                    b.HasIndex("Type");
-
-                    b.HasIndex("TelegramId", "IsRead");
-
-                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("GeoStud.Api.Models.ServiceClient", b =>
@@ -786,17 +698,6 @@ namespace GeoStud.Api.Migrations
                     b.Navigation("Subcategory");
                 });
 
-            modelBuilder.Entity("GeoStud.Api.Models.LocationSuggestion", b =>
-                {
-                    b.HasOne("GeoStud.Api.Models.Location", "Location")
-                        .WithMany()
-                        .HasForeignKey("LocationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Location");
-                });
-
             modelBuilder.Entity("GeoStud.Api.Models.Match", b =>
                 {
                     b.HasOne("GeoStud.Api.Models.User", "User1")
@@ -814,16 +715,6 @@ namespace GeoStud.Api.Migrations
                     b.Navigation("User1");
 
                     b.Navigation("User2");
-                });
-
-            modelBuilder.Entity("GeoStud.Api.Models.Notification", b =>
-                {
-                    b.HasOne("GeoStud.Api.Models.Location", "Location")
-                        .WithMany()
-                        .HasForeignKey("LocationId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Location");
                 });
 
             modelBuilder.Entity("GeoStud.Api.Models.UserAnalyticsResponse", b =>

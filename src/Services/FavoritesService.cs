@@ -98,35 +98,63 @@ public class FavoritesService : IFavoritesService
 
         _logger.LogDebug("Location {LocationId} found: {LocationName}", location.Id, location.Name);
 
-        // Check if already in favorites
+        // Check if already in favorites (including deleted ones, to handle unique index constraint)
         var existingFavorite = await _context.FavoriteLocations
-            .FirstOrDefaultAsync(f => f.UserId == userId && f.LocationId == request.LocationId && !f.IsDeleted);
+            .IgnoreQueryFilters() // Check even deleted records to handle unique index
+            .FirstOrDefaultAsync(f => f.UserId == userId && f.LocationId == request.LocationId);
+
+        FavoriteLocation favorite;
+        bool isRestored = false;
 
         if (existingFavorite != null)
         {
-            _logger.LogWarning("Location {LocationId} is already in favorites for user {UserId}", request.LocationId, userId);
-            throw new InvalidOperationException("Location is already in favorites");
+            if (!existingFavorite.IsDeleted)
+            {
+                _logger.LogWarning("Location {LocationId} is already in favorites for user {UserId}", request.LocationId, userId);
+                throw new InvalidOperationException("Location is already in favorites");
+            }
+
+            // Restore deleted favorite
+            _logger.LogDebug("Restoring deleted FavoriteLocation: Id={FavoriteId}, UserId={UserId}, LocationId={LocationId}", 
+                existingFavorite.Id, userId, request.LocationId);
+            
+            existingFavorite.IsDeleted = false;
+            existingFavorite.CreatedAt = DateTime.UtcNow;
+            existingFavorite.UpdatedAt = null;
+            
+            favorite = existingFavorite;
+            isRestored = true;
         }
-
-        // Create favorite
-        var favorite = new FavoriteLocation
+        else
         {
-            UserId = userId,
-            LocationId = request.LocationId,
-        };
+            // Create new favorite
+            favorite = new FavoriteLocation
+            {
+                UserId = userId,
+                LocationId = request.LocationId,
+                CreatedAt = DateTime.UtcNow
+            };
 
-        _logger.LogDebug("Creating FavoriteLocation: UserId={UserId}, LocationId={LocationId}", favorite.UserId, favorite.LocationId);
-
-        _context.FavoriteLocations.Add(favorite);
+            _logger.LogDebug("Creating FavoriteLocation: UserId={UserId}, LocationId={LocationId}", favorite.UserId, favorite.LocationId);
+            _context.FavoriteLocations.Add(favorite);
+        }
         
         try
         {
             var savedCount = await _context.SaveChangesAsync();
             _logger.LogInformation("Saved {Count} changes to database. FavoriteLocation Id: {FavoriteId}", savedCount, favorite.Id);
         }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateException dbEx)
+        {
+            _logger.LogError(dbEx, "Database error saving FavoriteLocation. Inner exception: {InnerException}", dbEx.InnerException?.Message);
+            _logger.LogError("FavoriteLocation details: UserId={UserId}, LocationId={LocationId}, CreatedAt={CreatedAt}", 
+                favorite.UserId, favorite.LocationId, favorite.CreatedAt);
+            throw new InvalidOperationException($"Error saving favorite location: {dbEx.InnerException?.Message ?? dbEx.Message}", dbEx);
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error saving FavoriteLocation to database");
+            _logger.LogError(ex, "Error saving FavoriteLocation to database. FavoriteLocation details: UserId={UserId}, LocationId={LocationId}", 
+                favorite.UserId, favorite.LocationId);
             throw;
         }
 
@@ -135,7 +163,8 @@ public class FavoritesService : IFavoritesService
             .Reference(f => f.Location)
             .LoadAsync();
 
-        _logger.LogDebug("FavoriteLocation {FavoriteId} created successfully for user {UserId}", favorite.Id, userId);
+        _logger.LogDebug("FavoriteLocation {FavoriteId} {Action} successfully for user {UserId}", 
+            favorite.Id, isRestored ? "restored" : "created", userId);
 
         return ToFavoriteLocationResponse(favorite);
     }
