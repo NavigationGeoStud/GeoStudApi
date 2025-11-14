@@ -47,7 +47,7 @@ else
     var PosgressServerConnection = builder.Configuration.GetConnectionString("DefaultConnection");
     if (string.IsNullOrEmpty(PosgressServerConnection))
     {
-        Console.WriteLine("❌ SQL Server connection string is empty!");
+        Console.WriteLine("❌ PostgreSQL connection string is empty!");
         Console.WriteLine("🔧 Available connection strings:");
         var connectionStrings = builder.Configuration.GetSection("ConnectionStrings").GetChildren();
         foreach (var connStr in connectionStrings)
@@ -58,7 +58,7 @@ else
     }
     
     builder.Services.AddDbContext<GeoStudDbContext>(options =>
-        options.UseSqlServer(PosgressServerConnection));
+        options.UseNpgsql(PosgressServerConnection));
     Console.WriteLine("📊 Using Posgress Server database");
     Console.WriteLine($"🔗 Connection: {PosgressServerConnection}");
 }
@@ -257,7 +257,7 @@ using (var scope = app.Services.CreateScope())
     }
     else
     {
-        Console.WriteLine("✅ Database initialized with SQL Server");
+        Console.WriteLine("✅ Database initialized with PostgreSQL");
     }
 }
 

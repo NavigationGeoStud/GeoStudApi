@@ -33,12 +33,18 @@ public class GeoStudDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // Determine the default SQL function based on database provider
+        // CURRENT_TIMESTAMP works for both PostgreSQL and SQLite, but SQLite prefers datetime('now')
+        // We'll use a simple check: if ProviderName contains "Sqlite", use datetime('now'), otherwise CURRENT_TIMESTAMP
+        var providerName = Database.ProviderName ?? "";
+        var isSqlite = providerName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
+        var defaultDateSql = isSqlite ? "datetime('now')" : "CURRENT_TIMESTAMP";
 
         // ServiceClient configuration
         modelBuilder.Entity<ServiceClient>(entity =>
         {
             entity.HasIndex(e => e.ClientId).IsUnique();
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(defaultDateSql);
         });
 
         // User configuration
@@ -50,7 +56,7 @@ public class GeoStudDbContext : DbContext
             entity.HasIndex(e => e.Email).IsUnique();
             // TelegramId must be unique if provided
             entity.HasIndex(e => e.TelegramId).IsUnique();
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(defaultDateSql);
             entity.HasIndex(e => e.AgeRange);
             entity.HasIndex(e => e.Gender);
             entity.HasIndex(e => e.IsStudent);
@@ -66,7 +72,7 @@ public class GeoStudDbContext : DbContext
         modelBuilder.Entity<UserAnalyticsResponse>(entity =>
         {
             entity.HasIndex(e => new { e.UserId, e.Question });
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(defaultDateSql);
             entity.HasOne(e => e.User)
                 .WithMany(u => u.Responses)
                 .HasForeignKey(e => e.UserId)
@@ -78,7 +84,7 @@ public class GeoStudDbContext : DbContext
         {
             entity.HasIndex(e => new { e.MetricName, e.Category });
             entity.HasIndex(e => e.CalculatedAt);
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(defaultDateSql);
         });
 
         // Location configuration
@@ -90,7 +96,7 @@ public class GeoStudDbContext : DbContext
             entity.HasIndex(e => e.IsActive);
             entity.HasIndex(e => e.IsVerified);
             entity.HasIndex(e => e.CategoryId);
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(defaultDateSql);
         });
 
         // LocationCategory configuration
@@ -99,7 +105,7 @@ public class GeoStudDbContext : DbContext
             entity.HasIndex(e => e.Name).IsUnique();
             entity.HasIndex(e => e.DisplayOrder);
             entity.HasIndex(e => e.IsActive);
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(defaultDateSql);
             entity.HasMany(e => e.Locations)
                 .WithOne(l => l.Category)
                 .HasForeignKey(l => l.CategoryId)
@@ -112,7 +118,7 @@ public class GeoStudDbContext : DbContext
             entity.HasIndex(e => new { e.CategoryId, e.Name }).IsUnique();
             entity.HasIndex(e => e.DisplayOrder);
             entity.HasIndex(e => e.IsActive);
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(defaultDateSql);
             entity.HasOne(e => e.Category)
                 .WithMany(c => c.Subcategories)
                 .HasForeignKey(e => e.CategoryId)
@@ -123,7 +129,7 @@ public class GeoStudDbContext : DbContext
         modelBuilder.Entity<LocationSubcategoryJoin>(entity =>
         {
             entity.HasKey(e => new { e.LocationId, e.SubcategoryId });
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(defaultDateSql);
             entity.HasOne(e => e.Location)
                 .WithMany(l => l.SubcategoryJoins)
                 .HasForeignKey(e => e.LocationId)
@@ -139,7 +145,7 @@ public class GeoStudDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.UserId, e.LocationId }).IsUnique();
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(defaultDateSql);
             entity.HasOne(e => e.User)
                 .WithMany(u => u.FavoriteLocations)
                 .HasForeignKey(e => e.UserId)
@@ -156,7 +162,7 @@ public class GeoStudDbContext : DbContext
             entity.HasIndex(e => new { e.UserId, e.TargetUserId }).IsUnique();
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => e.TargetUserId);
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(defaultDateSql);
             entity.HasOne(e => e.User)
                 .WithMany()
                 .HasForeignKey(e => e.UserId)
@@ -173,7 +179,7 @@ public class GeoStudDbContext : DbContext
             entity.HasIndex(e => new { e.UserId, e.TargetUserId }).IsUnique();
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => e.TargetUserId);
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(defaultDateSql);
             entity.HasOne(e => e.User)
                 .WithMany()
                 .HasForeignKey(e => e.UserId)
@@ -190,7 +196,7 @@ public class GeoStudDbContext : DbContext
             entity.HasIndex(e => new { e.UserId1, e.UserId2 }).IsUnique();
             entity.HasIndex(e => e.UserId1);
             entity.HasIndex(e => e.UserId2);
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(defaultDateSql);
             entity.HasOne(e => e.User1)
                 .WithMany()
                 .HasForeignKey(e => e.UserId1)
@@ -208,7 +214,7 @@ public class GeoStudDbContext : DbContext
             entity.HasIndex(e => new { e.TelegramId, e.IsRead });
             entity.HasIndex(e => e.CreatedAt);
             entity.HasIndex(e => e.Type);
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(defaultDateSql);
             entity.HasOne(e => e.Location)
                 .WithMany()
                 .HasForeignKey(e => e.LocationId)
@@ -222,7 +228,7 @@ public class GeoStudDbContext : DbContext
             entity.HasIndex(e => e.TelegramId);
             entity.HasIndex(e => e.LocationId);
             entity.HasIndex(e => e.Status);
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(defaultDateSql);
             entity.HasOne(e => e.Location)
                 .WithMany()
                 .HasForeignKey(e => e.LocationId)

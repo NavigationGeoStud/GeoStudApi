@@ -122,6 +122,7 @@ public class FavoritesService : IFavoritesService
             existingFavorite.CreatedAt = DateTime.UtcNow;
             existingFavorite.UpdatedAt = null;
             
+
             favorite = existingFavorite;
             isRestored = true;
         }
