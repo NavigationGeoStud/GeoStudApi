@@ -10,20 +10,131 @@ using GeoStud.Api.Services.Interfaces;
 var builder = WebApplication.CreateBuilder(args);
 
 // Determine database provider based on environment or command line arguments
-var useSqlite = builder.Environment.EnvironmentName == "Local" || 
-                builder.Environment.EnvironmentName == "Development" ||
-                args.Contains("--sqlite") || 
-                args.Contains("--local") ||
-                Environment.GetEnvironmentVariable("FORCE_SQLITE") == "true";
+// Check if PostgreSQL connection string is available from configuration or environment
+// IMPORTANT: In Aspire, environment variables are available through Configuration
+// Aspire passes connection strings via environment variables with double underscore format
+// which ASP.NET Core automatically converts to nested configuration keys
+
+// First check configuration (includes environment variables set by Aspire)
+var postgresConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+
+// Also check environment variable directly (for debugging)
+var postgresConnectionEnv = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
+
+// Also check if WithReference created a variable like {dbResourceName}__ConnectionString
+// Common database resource names in Aspire
+var possibleDbNames = new[] { "GeoStudDb", "postgres", "postgres-db", "database" };
+string? postgresConnectionFromRef = null;
+foreach (var dbName in possibleDbNames)
+{
+    // Check both environment variable and configuration
+    var refVarEnv = Environment.GetEnvironmentVariable($"{dbName}__ConnectionString");
+    var refVarConfig = builder.Configuration[$"{dbName}__ConnectionString"];
+    var refVar = refVarEnv ?? refVarConfig;
+    if (!string.IsNullOrEmpty(refVar))
+    {
+        postgresConnectionFromRef = refVar;
+        Console.WriteLine($"🔗 Found connection string from WithReference: {dbName}__ConnectionString");
+        break;
+    }
+}
+var hasPostgresConnection = !string.IsNullOrEmpty(postgresConnection) || 
+                          !string.IsNullOrEmpty(postgresConnectionEnv) || 
+                          !string.IsNullOrEmpty(postgresConnectionFromRef);
+
+// Check if connection string is actually PostgreSQL (not SQL Server or empty)
+// Use the first available connection string in priority order: WithReference > Env > Config
+var actualConnectionString = postgresConnectionFromRef ?? postgresConnectionEnv ?? postgresConnection;
+var isPostgresConnection = false;
+if (!string.IsNullOrEmpty(actualConnectionString))
+{
+    // PostgreSQL connection strings typically contain "Host=" or "Server=" with "Username=" or "User Id="
+    // and NOT "Trusted_Connection" (which is SQL Server specific)
+    isPostgresConnection = (actualConnectionString.Contains("Host=") || 
+                           (actualConnectionString.Contains("Server=") && actualConnectionString.Contains("Database="))) &&
+                          (actualConnectionString.Contains("Username=") || actualConnectionString.Contains("User Id=")) &&
+                          !actualConnectionString.Contains("Trusted_Connection");
+}
+
+// SQLite should be used only if:
+// 1. Explicitly requested via arguments or environment variable
+// 2. OR environment is Local/Development AND no valid PostgreSQL connection is available
+var forceSqlite = args.Contains("--sqlite") || 
+                  args.Contains("--local") ||
+                  Environment.GetEnvironmentVariable("FORCE_SQLITE") == "true";
+
+var useSqlite = forceSqlite || 
+                (builder.Environment.EnvironmentName == "Local" && !isPostgresConnection) ||
+                (builder.Environment.EnvironmentName == "Development" && !isPostgresConnection);
 
 // Override environment if SQLite arguments are provided
-if (args.Contains("--sqlite") || args.Contains("--local") || Environment.GetEnvironmentVariable("FORCE_SQLITE") == "true")
+if (forceSqlite)
 {
     builder.Environment.EnvironmentName = "Local";
 }
 
-Console.WriteLine($"🔧 Database Provider: {(useSqlite ? "SQLite" : "PosgressDB")}");
+// Детальное логирование всех переменных окружения для диагностики
+Console.WriteLine("🔍 DEBUG: Checking all connection string environment variables:");
+Console.WriteLine($"   ConnectionStrings__DefaultConnection (env): {(string.IsNullOrEmpty(postgresConnectionEnv) ? "NOT SET" : "SET")}");
+if (!string.IsNullOrEmpty(postgresConnectionEnv))
+{
+    var masked = postgresConnectionEnv.Contains("Password=") 
+        ? postgresConnectionEnv.Substring(0, Math.Min(postgresConnectionEnv.IndexOf("Password=") + 20, postgresConnectionEnv.Length)) + "***" 
+        : postgresConnectionEnv;
+    Console.WriteLine($"   Value: {masked}");
+}
+
+foreach (var dbName in possibleDbNames)
+{
+    var refVar = Environment.GetEnvironmentVariable($"{dbName}__ConnectionString");
+    Console.WriteLine($"   {dbName}__ConnectionString: {(string.IsNullOrEmpty(refVar) ? "NOT SET" : "SET")}");
+    if (!string.IsNullOrEmpty(refVar))
+    {
+        var masked = refVar.Contains("Password=") 
+            ? refVar.Substring(0, Math.Min(refVar.IndexOf("Password=") + 20, refVar.Length)) + "***" 
+            : refVar;
+        Console.WriteLine($"   Value: {masked}");
+    }
+}
+
+Console.WriteLine($"   DefaultConnection (config): {(string.IsNullOrEmpty(postgresConnection) ? "NOT SET" : "SET")}");
+if (!string.IsNullOrEmpty(postgresConnection))
+{
+    var masked = postgresConnection.Contains("Password=") 
+        ? postgresConnection.Substring(0, Math.Min(postgresConnection.IndexOf("Password=") + 20, postgresConnection.Length)) + "***" 
+        : postgresConnection;
+    Console.WriteLine($"   Value: {masked}");
+}
+
+Console.WriteLine($"🔧 Database Provider: {(useSqlite ? "SQLite" : "PostgreSQL")}");
 Console.WriteLine($"🌍 Environment: {builder.Environment.EnvironmentName}");
+Console.WriteLine($"📊 Has PostgreSQL connection: {hasPostgresConnection}, Is valid PostgreSQL: {isPostgresConnection}");
+if (hasPostgresConnection)
+{
+    var connStr = actualConnectionString ?? "";
+    var maskedConnStr = connStr.Contains("Password=") 
+        ? connStr.Substring(0, Math.Min(connStr.IndexOf("Password=") + 20, connStr.Length)) + "***" 
+        : (connStr.Length > 100 ? connStr.Substring(0, 100) + "..." : connStr);
+    Console.WriteLine($"🔗 Connection string source: {(postgresConnectionFromRef != null ? "WithReference" : postgresConnectionEnv != null ? "Environment" : "Configuration")}");
+    Console.WriteLine($"🔗 Connection string: {maskedConnStr}");
+}
+else
+{
+    Console.WriteLine("❌ NO PostgreSQL connection string found from any source!");
+}
+
+if (isPostgresConnection && !useSqlite)
+{
+    Console.WriteLine("✅ Valid PostgreSQL connection string found - using PostgreSQL");
+}
+else if (!isPostgresConnection && !useSqlite)
+{
+    Console.WriteLine("⚠️ No valid PostgreSQL connection string found, but SQLite not forced - will try to use PostgreSQL anyway");
+}
+else if (useSqlite)
+{
+    Console.WriteLine("⚠️ SQLite will be used (forced or no valid PostgreSQL connection)");
+}
 
 // Add services to the container
 builder.Services.AddControllers()
@@ -44,23 +155,44 @@ if (useSqlite)
 }
 else
 {
-    var PosgressServerConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+    // Try to get connection string in priority order: WithReference > Environment > Configuration
+    var PosgressServerConnection = postgresConnectionFromRef;
+    if (string.IsNullOrEmpty(PosgressServerConnection))
+    {
+        // Try environment variable (Aspire uses ConnectionStrings__DefaultConnection)
+        PosgressServerConnection = postgresConnectionEnv;
+    }
+    if (string.IsNullOrEmpty(PosgressServerConnection))
+    {
+        // Finally try configuration (appsettings.json)
+        PosgressServerConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+    }
+    
     if (string.IsNullOrEmpty(PosgressServerConnection))
     {
         Console.WriteLine("❌ PostgreSQL connection string is empty!");
-        Console.WriteLine("🔧 Available connection strings:");
+        Console.WriteLine("🔧 Available connection strings from configuration:");
         var connectionStrings = builder.Configuration.GetSection("ConnectionStrings").GetChildren();
         foreach (var connStr in connectionStrings)
         {
-            Console.WriteLine($"  - {connStr.Key}: {connStr.Value}");
+            var masked = connStr.Value?.Contains("Password=") == true
+                ? connStr.Value.Substring(0, Math.Min(connStr.Value.IndexOf("Password=") + 20, connStr.Value.Length)) + "***"
+                : connStr.Value;
+            Console.WriteLine($"  - {connStr.Key}: {masked}");
         }
-        throw new InvalidOperationException("Posgress Db connection string is not configured");
+        Console.WriteLine("🔧 Environment variable ConnectionStrings__DefaultConnection:");
+        var envConnStr = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
+        Console.WriteLine($"  - {(string.IsNullOrEmpty(envConnStr) ? "NOT SET" : "SET")}");
+        throw new InvalidOperationException("PostgreSQL connection string is not configured");
     }
     
     builder.Services.AddDbContext<GeoStudDbContext>(options =>
         options.UseNpgsql(PosgressServerConnection));
-    Console.WriteLine("📊 Using Posgress Server database");
-    Console.WriteLine($"🔗 Connection: {PosgressServerConnection}");
+    Console.WriteLine("📊 Using PostgreSQL Server database");
+    var maskedConn = PosgressServerConnection.Contains("Password=") 
+        ? PosgressServerConnection.Substring(0, Math.Min(PosgressServerConnection.IndexOf("Password=") + 20, PosgressServerConnection.Length)) + "***" 
+        : PosgressServerConnection;
+    Console.WriteLine($"🔗 Connection: {maskedConn}");
 }
 
 // Authentication & Authorization
