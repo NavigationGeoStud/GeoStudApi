@@ -12,6 +12,7 @@ using RoleCheckResponse = GeoStud.Api.DTOs.User.RoleCheckResponse;
 using AssignRoleRequest = GeoStud.Api.DTOs.User.AssignRoleRequest;
 using UpdateRoleRequest = GeoStud.Api.DTOs.User.UpdateRoleRequest;
 using CreateLocationTelegramRequest = GeoStud.Api.DTOs.Location.CreateLocationTelegramRequest;
+using UpdateLocationModerationRequest = GeoStud.Api.DTOs.Location.UpdateLocationModerationRequest;
 using GeoStud.Api.Models;
 
 namespace GeoStud.Api.Controllers.V1;
@@ -1173,6 +1174,258 @@ public class TelegramController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting webhook configuration");
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    /// <summary>
+    /// Get list of locations for moderation (only Manager or Admin)
+    /// </summary>
+    /// <param name="telegramId">Telegram ID of the user making the request</param>
+    /// <param name="page">Page number (default: 1)</param>
+    /// <param name="pageSize">Page size (default: 20)</param>
+    /// <returns>Paginated list of locations requiring moderation</returns>
+    [HttpGet("locations/moderation")]
+    [ProducesResponseType(typeof(PagedResponse<LocationResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetLocationsForModeration([FromQuery] long telegramId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    {
+        try
+        {
+            if (telegramId == 0)
+            {
+                return BadRequest(new { error = "telegramId query parameter is required and must be a valid Telegram user ID" });
+            }
+
+            // Check user role - only Admin (2) or Manager (1) can access moderation
+            var roleResponse = await _roleService.GetUserRoleAsync(telegramId);
+            if (roleResponse == null)
+            {
+                return NotFound(new { error = "User not found" });
+            }
+
+            if (!roleResponse.IsAdmin && !roleResponse.IsManager)
+            {
+                _logger.LogWarning("Unauthorized moderation access attempt. TelegramId: {TelegramId} does not have required role", telegramId);
+                return StatusCode(403, new { error = "Only administrators and managers can access moderation" });
+            }
+
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 20;
+            if (pageSize > 100) pageSize = 100;
+
+            var response = await _locationService.GetLocationsForModerationAsync(page, pageSize);
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving locations for moderation");
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    /// <summary>
+    /// Get location by ID (only Manager or Admin)
+    /// </summary>
+    /// <param name="locationId">Location ID</param>
+    /// <param name="telegramId">Telegram ID of the user making the request</param>
+    /// <returns>Location response</returns>
+    [HttpGet("locations/{locationId}")]
+    [ProducesResponseType(typeof(LocationResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetLocationById(int locationId, [FromQuery] long telegramId)
+    {
+        try
+        {
+            if (telegramId == 0)
+            {
+                return BadRequest(new { error = "telegramId query parameter is required and must be a valid Telegram user ID" });
+            }
+
+            // Check user role - only Admin (2) or Manager (1) can access moderation
+            var roleResponse = await _roleService.GetUserRoleAsync(telegramId);
+            if (roleResponse == null)
+            {
+                return NotFound(new { error = "User not found" });
+            }
+
+            if (!roleResponse.IsAdmin && !roleResponse.IsManager)
+            {
+                _logger.LogWarning("Unauthorized moderation access attempt. TelegramId: {TelegramId} does not have required role", telegramId);
+                return StatusCode(403, new { error = "Only administrators and managers can access moderation" });
+            }
+
+            var location = await _locationService.GetLocationByIdAsync(locationId);
+            if (location == null)
+            {
+                return NotFound(new { error = "Location not found" });
+            }
+
+            return Ok(location);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving location by ID");
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    /// <summary>
+    /// Update location during moderation (only Manager or Admin)
+    /// </summary>
+    /// <param name="locationId">Location ID</param>
+    /// <param name="request">Location update request (all fields optional)</param>
+    /// <param name="telegramId">Telegram ID of the user making the request</param>
+    /// <returns>Updated location response</returns>
+    [HttpPut("locations/{locationId}/moderation")]
+    [ProducesResponseType(typeof(LocationResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateLocationForModeration(int locationId, [FromBody] UpdateLocationModerationRequest request, [FromQuery] long telegramId)
+    {
+        try
+        {
+            if (telegramId == 0)
+            {
+                return BadRequest(new { error = "telegramId query parameter is required and must be a valid Telegram user ID" });
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            // Check user role - only Admin (2) or Manager (1) can access moderation
+            var roleResponse = await _roleService.GetUserRoleAsync(telegramId);
+            if (roleResponse == null)
+            {
+                return NotFound(new { error = "User not found" });
+            }
+
+            if (!roleResponse.IsAdmin && !roleResponse.IsManager)
+            {
+                _logger.LogWarning("Unauthorized moderation access attempt. TelegramId: {TelegramId} does not have required role", telegramId);
+                return StatusCode(403, new { error = "Only administrators and managers can access moderation" });
+            }
+
+            var location = await _locationService.UpdateLocationForModerationAsync(locationId, request);
+            if (location == null)
+            {
+                return NotFound(new { error = "Location not found" });
+            }
+
+            return Ok(location);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "Invalid location update request");
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating location for moderation");
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    /// <summary>
+    /// Approve location (only Manager or Admin)
+    /// </summary>
+    /// <param name="locationId">Location ID</param>
+    /// <param name="telegramId">Telegram ID of the user making the request</param>
+    /// <returns>Success status</returns>
+    [HttpPost("locations/{locationId}/approve")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ApproveLocation(int locationId, [FromQuery] long telegramId)
+    {
+        try
+        {
+            if (telegramId == 0)
+            {
+                return BadRequest(new { error = "telegramId query parameter is required and must be a valid Telegram user ID" });
+            }
+
+            // Check user role - only Admin (2) or Manager (1) can access moderation
+            var roleResponse = await _roleService.GetUserRoleAsync(telegramId);
+            if (roleResponse == null)
+            {
+                return NotFound(new { error = "User not found" });
+            }
+
+            if (!roleResponse.IsAdmin && !roleResponse.IsManager)
+            {
+                _logger.LogWarning("Unauthorized moderation access attempt. TelegramId: {TelegramId} does not have required role", telegramId);
+                return StatusCode(403, new { error = "Only administrators and managers can access moderation" });
+            }
+
+            var success = await _locationService.ApproveLocationAsync(locationId);
+            if (!success)
+            {
+                return NotFound(new { error = "Location not found" });
+            }
+
+            return Ok(new { message = "Location approved successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error approving location");
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    /// <summary>
+    /// Delete location during moderation (only Manager or Admin)
+    /// </summary>
+    /// <param name="locationId">Location ID</param>
+    /// <param name="telegramId">Telegram ID of the user making the request</param>
+    /// <returns>Success status</returns>
+    [HttpDelete("locations/{locationId}/moderation")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteLocationForModeration(int locationId, [FromQuery] long telegramId)
+    {
+        try
+        {
+            if (telegramId == 0)
+            {
+                return BadRequest(new { error = "telegramId query parameter is required and must be a valid Telegram user ID" });
+            }
+
+            // Check user role - only Admin (2) or Manager (1) can access moderation
+            var roleResponse = await _roleService.GetUserRoleAsync(telegramId);
+            if (roleResponse == null)
+            {
+                return NotFound(new { error = "User not found" });
+            }
+
+            if (!roleResponse.IsAdmin && !roleResponse.IsManager)
+            {
+                _logger.LogWarning("Unauthorized moderation access attempt. TelegramId: {TelegramId} does not have required role", telegramId);
+                return StatusCode(403, new { error = "Only administrators and managers can access moderation" });
+            }
+
+            var success = await _locationService.DeleteLocationAsync(locationId);
+            if (!success)
+            {
+                return NotFound(new { error = "Location not found" });
+            }
+
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting location for moderation");
             return StatusCode(500, "Internal server error");
         }
     }

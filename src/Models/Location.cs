@@ -45,6 +45,8 @@ public class Location : BaseEntity
     
     public bool IsVerified { get; set; } = false;
     
+    public bool NeedModerate { get; set; } = false;
+    
     [Required]
     public int CategoryId { get; set; }
     

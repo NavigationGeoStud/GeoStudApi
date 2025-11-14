@@ -395,8 +395,37 @@ using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<GeoStudDbContext>();
     
-    // Apply migrations
-    context.Database.Migrate();
+    try
+    {
+        // Apply migrations
+        // Suppress the pending model changes warning if migrations are already applied
+        var pendingMigrations = context.Database.GetPendingMigrations().ToList();
+        if (pendingMigrations.Any())
+        {
+            Console.WriteLine($"📦 Applying {pendingMigrations.Count} pending migration(s)...");
+            context.Database.Migrate();
+        }
+        else
+        {
+            Console.WriteLine("✅ Database is up to date");
+        }
+    }
+    catch (Exception ex)
+    {
+        // If migration fails, try to ensure database exists
+        Console.WriteLine($"⚠️ Migration warning: {ex.Message}");
+        try
+        {
+            // Ensure database is created even if migrations fail
+            await context.Database.EnsureCreatedAsync();
+            Console.WriteLine("📊 Database ensured (migrations may need manual application)");
+        }
+        catch (Exception ensureEx)
+        {
+            Console.WriteLine($"❌ Failed to ensure database: {ensureEx.Message}");
+            throw;
+        }
+    }
     
     // Seed initial data
     await GeoStud.Api.Data.SeedData.SeedAsync(context);

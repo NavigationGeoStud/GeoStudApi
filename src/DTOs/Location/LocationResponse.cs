@@ -17,6 +17,7 @@ public class LocationResponse
     public string? WorkingHours { get; set; }
     public bool IsActive { get; set; }
     public bool IsVerified { get; set; }
+    public bool NeedModerate { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     

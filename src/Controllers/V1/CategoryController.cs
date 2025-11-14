@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using GeoStud.Api.DTOs.Location;
 using GeoStud.Api.Services.Interfaces;
+using CategorySimpleResponse = GeoStud.Api.DTOs.Location.CategorySimpleResponse;
 
 namespace GeoStud.Api.Controllers.V1;
 
@@ -23,18 +24,23 @@ public class CategoryController : ControllerBase
     }
 
     /// <summary>
-    /// Get all categories
+    /// Get all categories (returns only id and name)
     /// </summary>
-    /// <returns>List of categories</returns>
+    /// <returns>List of categories with id and name only</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(IEnumerable<CategoryResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(IEnumerable<CategorySimpleResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetCategories()
     {
         try
         {
             var categories = await _categoryService.GetCategoriesAsync();
-            return Ok(categories);
+            var simpleCategories = categories.Select(c => new CategorySimpleResponse
+            {
+                Id = c.Id,
+                Name = c.Name
+            });
+            return Ok(simpleCategories);
         }
         catch (Exception ex)
         {
