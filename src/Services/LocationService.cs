@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using GeoStud.Api.Data;
 using GeoStud.Api.DTOs.Location;
+using GeoStud.Api.DTOs.Common;
 using GeoStud.Api.Models;
 using GeoStud.Api.Services.Interfaces;
 using CreateLocationTelegramRequest = GeoStud.Api.DTOs.Location.CreateLocationTelegramRequest;
+using UpdateLocationModerationRequest = GeoStud.Api.DTOs.Location.UpdateLocationModerationRequest;
 
 namespace GeoStud.Api.Services;
 
@@ -20,7 +22,9 @@ public class LocationService : ILocationService
 
     public async Task<IEnumerable<LocationResponse>> GetLocationsAsync(int? categoryId = null, int? subcategoryId = null, string? city = null)
     {
-        var query = _context.Locations.AsQueryable();
+        var query = _context.Locations
+            .Where(l => !l.NeedModerate && !l.IsDeleted) // Exclude locations requiring moderation
+            .AsQueryable();
 
         // Filter by category if provided
         if (categoryId.HasValue)
@@ -77,7 +81,7 @@ public class LocationService : ILocationService
         }
 
         var locations = await _context.Locations
-            .Where(l => l.CategoryId == categoryId && !l.IsDeleted)
+            .Where(l => l.CategoryId == categoryId && !l.NeedModerate && !l.IsDeleted)
             .Include(l => l.Category)
             .Include(l => l.SubcategoryJoins)
                 .ThenInclude(sj => sj.Subcategory)
@@ -132,6 +136,7 @@ public class LocationService : ILocationService
             WorkingHours = request.WorkingHours,
             IsActive = request.IsActive,
             IsVerified = request.IsVerified,
+            NeedModerate = request.NeedModerate,
             CategoryId = request.CategoryId
         };
 
@@ -321,6 +326,7 @@ public class LocationService : ILocationService
         // Note: This is a simplified implementation
         // For production, consider using SQL spatial queries or a proper geospatial library
         var locations = await _context.Locations
+            .Where(l => !l.NeedModerate && !l.IsDeleted)
             .Include(l => l.Category)
             .Include(l => l.SubcategoryJoins)
                 .ThenInclude(sj => sj.Subcategory)
@@ -362,6 +368,7 @@ public class LocationService : ILocationService
             WorkingHours = location.WorkingHours,
             IsActive = location.IsActive,
             IsVerified = location.IsVerified,
+            NeedModerate = location.NeedModerate,
             CreatedAt = location.CreatedAt,
             UpdatedAt = location.UpdatedAt,
             Category = new LocationResponse.CategoryInfo
@@ -467,6 +474,7 @@ public class LocationService : ILocationService
             WorkingHours = request.WorkingHours,
             IsActive = true,
             IsVerified = false,
+            NeedModerate = true, // Locations created via Telegram require moderation
             CategoryId = request.CategoryId
         };
 
@@ -502,6 +510,200 @@ public class LocationService : ILocationService
             .LoadAsync();
 
         return ToLocationResponse(location);
+    }
+
+    public async Task<PagedResponse<LocationResponse>> GetLocationsForModerationAsync(int page = 1, int pageSize = 20)
+    {
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 20;
+        if (pageSize > 100) pageSize = 100;
+
+        var query = _context.Locations
+            .Where(l => l.NeedModerate && !l.IsDeleted)
+            .Include(l => l.Category)
+            .Include(l => l.SubcategoryJoins)
+                .ThenInclude(sj => sj.Subcategory);
+
+        var totalCount = await query.CountAsync();
+        var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+
+        var locations = await query
+            .OrderByDescending(l => l.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        var locationResponses = locations.Select(ToLocationResponse).ToList();
+
+        return new PagedResponse<LocationResponse>
+        {
+            Data = locationResponses,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount,
+            TotalPages = totalPages,
+            HasPreviousPage = page > 1,
+            HasNextPage = page < totalPages
+        };
+    }
+
+    public async Task<LocationResponse?> UpdateLocationForModerationAsync(int id, UpdateLocationModerationRequest request)
+    {
+        var location = await _context.Locations
+            .Include(l => l.Category)
+            .Include(l => l.SubcategoryJoins)
+                .ThenInclude(sj => sj.Subcategory)
+            .FirstOrDefaultAsync(l => l.Id == id && !l.IsDeleted);
+
+        if (location == null)
+        {
+            return null;
+        }
+
+        // Update only provided fields
+        if (request.Name != null)
+        {
+            location.Name = request.Name;
+        }
+
+        if (request.Description != null)
+        {
+            location.Description = request.Description;
+        }
+
+        if (request.Address != null)
+        {
+            location.Address = request.Address;
+        }
+
+        if (request.City != null)
+        {
+            location.City = request.City;
+        }
+
+        if (request.Phone != null)
+        {
+            location.Phone = request.Phone;
+        }
+
+        if (request.Website != null)
+        {
+            location.Website = request.Website;
+        }
+
+        if (request.TelegramImageIds != null)
+        {
+            location.TelegramImageIds = request.TelegramImageIds;
+        }
+
+        if (request.Rating.HasValue)
+        {
+            location.Rating = request.Rating.Value;
+        }
+
+        if (request.PriceRange != null)
+        {
+            location.PriceRange = request.PriceRange;
+        }
+
+        if (request.WorkingHours != null)
+        {
+            location.WorkingHours = request.WorkingHours;
+        }
+
+        // Update category if provided
+        if (request.CategoryId.HasValue)
+        {
+            var category = await _context.LocationCategories
+                .FirstOrDefaultAsync(c => c.Id == request.CategoryId.Value && c.IsActive && !c.IsDeleted);
+
+            if (category == null)
+            {
+                throw new ArgumentException("Category not found or inactive", nameof(request));
+            }
+
+            location.CategoryId = request.CategoryId.Value;
+        }
+
+        // Update subcategories if provided
+        if (request.SubcategoryIds != null)
+        {
+            // Validate subcategories belong to the category
+            var categoryId = request.CategoryId ?? location.CategoryId;
+            var invalidSubcategories = await _context.LocationSubcategories
+                .Where(s => request.SubcategoryIds.Contains(s.Id) && (s.CategoryId != categoryId || !s.IsActive))
+                .ToListAsync();
+
+            if (invalidSubcategories.Any())
+            {
+                throw new ArgumentException("Some subcategories do not belong to the selected category or are inactive", nameof(request));
+            }
+
+            // Remove old subcategory associations
+            var existingSubcategoryIds = location.SubcategoryJoins.Select(sj => sj.SubcategoryId).ToList();
+            var newSubcategoryIds = request.SubcategoryIds.ToList();
+
+            var subcategoriesToRemove = location.SubcategoryJoins
+                .Where(sj => !newSubcategoryIds.Contains(sj.SubcategoryId))
+                .ToList();
+            foreach (var join in subcategoriesToRemove)
+            {
+                _context.LocationSubcategoryJoins.Remove(join);
+            }
+
+            // Add new subcategory associations
+            var subcategoriesToAdd = newSubcategoryIds
+                .Where(sid => !existingSubcategoryIds.Contains(sid))
+                .ToList();
+
+            if (subcategoriesToAdd.Any())
+            {
+                var validSubcategories = await _context.LocationSubcategories
+                    .Where(s => subcategoriesToAdd.Contains(s.Id) && s.IsActive)
+                    .ToListAsync();
+
+                var newSubcategoryJoins = validSubcategories.Select(s => new LocationSubcategoryJoin
+                {
+                    LocationId = location.Id,
+                    SubcategoryId = s.Id
+                }).ToList();
+
+                _context.LocationSubcategoryJoins.AddRange(newSubcategoryJoins);
+            }
+        }
+
+        location.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        // Reload with category and subcategories
+        await _context.Entry(location)
+            .Reference(l => l.Category)
+            .LoadAsync();
+            
+        await _context.Entry(location)
+            .Collection(l => l.SubcategoryJoins)
+            .Query()
+            .Include(sj => sj.Subcategory)
+            .LoadAsync();
+
+        return ToLocationResponse(location);
+    }
+
+    public async Task<bool> ApproveLocationAsync(int id)
+    {
+        var location = await _context.Locations
+            .FirstOrDefaultAsync(l => l.Id == id && !l.IsDeleted);
+
+        if (location == null)
+        {
+            return false;
+        }
+
+        location.NeedModerate = false;
+        location.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        return true;
     }
 }
 
