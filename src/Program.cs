@@ -15,8 +15,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Aspire passes connection strings via environment variables with double underscore format
 // which ASP.NET Core automatically converts to nested configuration keys
 
-// First check configuration (includes environment variables set by Aspire)
-var postgresConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+// Check configuration (includes environment variables set by Aspire)
+// ASP.NET Core automatically converts ConnectionStrings__DefaultConnection env var to ConnectionStrings:DefaultConnection config
+var postgresConnectionFromConfig = builder.Configuration.GetConnectionString("DefaultConnection");
 
 // Also check environment variable directly (for debugging)
 var postgresConnectionEnv = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
@@ -38,22 +39,33 @@ foreach (var dbName in possibleDbNames)
         break;
     }
 }
-var hasPostgresConnection = !string.IsNullOrEmpty(postgresConnection) || 
+var hasPostgresConnection = !string.IsNullOrEmpty(postgresConnectionFromConfig) || 
                           !string.IsNullOrEmpty(postgresConnectionEnv) || 
                           !string.IsNullOrEmpty(postgresConnectionFromRef);
 
 // Check if connection string is actually PostgreSQL (not SQL Server or empty)
 // Use the first available connection string in priority order: WithReference > Env > Config
-var actualConnectionString = postgresConnectionFromRef ?? postgresConnectionEnv ?? postgresConnection;
+var actualConnectionString = postgresConnectionFromRef ?? postgresConnectionEnv ?? postgresConnectionFromConfig;
+
+// If connection string comes from WithReference (Aspire), it's definitely PostgreSQL
+var isPostgresFromAspire = postgresConnectionFromRef != null;
+
 var isPostgresConnection = false;
 if (!string.IsNullOrEmpty(actualConnectionString))
 {
     // PostgreSQL connection strings typically contain "Host=" or "Server=" with "Username=" or "User Id="
     // and NOT "Trusted_Connection" (which is SQL Server specific)
-    isPostgresConnection = (actualConnectionString.Contains("Host=") || 
-                           (actualConnectionString.Contains("Server=") && actualConnectionString.Contains("Database="))) &&
-                          (actualConnectionString.Contains("Username=") || actualConnectionString.Contains("User Id=")) &&
-                          !actualConnectionString.Contains("Trusted_Connection");
+    // Also check for PostgreSQL-specific patterns
+    var isPostgresPattern = (actualConnectionString.Contains("Host=") || 
+                            (actualConnectionString.Contains("Server=") && actualConnectionString.Contains("Database="))) &&
+                           (actualConnectionString.Contains("Username=") || actualConnectionString.Contains("User Id=")) &&
+                           !actualConnectionString.Contains("Trusted_Connection");
+    
+    // Also check for PostgreSQL port (5432) or npgsql-specific patterns
+    var hasPostgresPort = actualConnectionString.Contains("Port=5432") || actualConnectionString.Contains(":5432");
+    var hasNpgsqlPattern = actualConnectionString.Contains("npgsql") || actualConnectionString.Contains("PostgreSQL");
+    
+    isPostgresConnection = isPostgresFromAspire || isPostgresPattern || hasPostgresPort || hasNpgsqlPattern;
 }
 
 // SQLite should be used only if:
@@ -63,9 +75,13 @@ var forceSqlite = args.Contains("--sqlite") ||
                   args.Contains("--local") ||
                   Environment.GetEnvironmentVariable("FORCE_SQLITE") == "true";
 
-var useSqlite = forceSqlite || 
-                (builder.Environment.EnvironmentName == "Local" && !isPostgresConnection) ||
-                (builder.Environment.EnvironmentName == "Development" && !isPostgresConnection);
+// Force PostgreSQL if connection string is set via Aspire (WithReference)
+var forcePostgres = isPostgresFromAspire || 
+                   Environment.GetEnvironmentVariable("FORCE_POSTGRESQL") == "true";
+
+var useSqlite = forceSqlite && !forcePostgres && 
+                ((builder.Environment.EnvironmentName == "Local" && !isPostgresConnection) ||
+                 (builder.Environment.EnvironmentName == "Development" && !isPostgresConnection));
 
 // Override environment if SQLite arguments are provided
 if (forceSqlite)
@@ -97,12 +113,12 @@ foreach (var dbName in possibleDbNames)
     }
 }
 
-Console.WriteLine($"   DefaultConnection (config): {(string.IsNullOrEmpty(postgresConnection) ? "NOT SET" : "SET")}");
-if (!string.IsNullOrEmpty(postgresConnection))
+Console.WriteLine($"   DefaultConnection (config): {(string.IsNullOrEmpty(postgresConnectionFromConfig) ? "NOT SET" : "SET")}");
+if (!string.IsNullOrEmpty(postgresConnectionFromConfig))
 {
-    var masked = postgresConnection.Contains("Password=") 
-        ? postgresConnection.Substring(0, Math.Min(postgresConnection.IndexOf("Password=") + 20, postgresConnection.Length)) + "***" 
-        : postgresConnection;
+    var masked = postgresConnectionFromConfig.Contains("Password=") 
+        ? postgresConnectionFromConfig.Substring(0, Math.Min(postgresConnectionFromConfig.IndexOf("Password=") + 20, postgresConnectionFromConfig.Length)) + "***" 
+        : postgresConnectionFromConfig;
     Console.WriteLine($"   Value: {masked}");
 }
 
@@ -164,7 +180,12 @@ else
     }
     if (string.IsNullOrEmpty(PosgressServerConnection))
     {
-        // Finally try configuration (appsettings.json)
+        // Try configuration (which includes environment variables in ASP.NET Core)
+        PosgressServerConnection = postgresConnectionFromConfig;
+    }
+    if (string.IsNullOrEmpty(PosgressServerConnection))
+    {
+        // Finally try configuration from appsettings.json
         PosgressServerConnection = builder.Configuration.GetConnectionString("DefaultConnection");
     }
     

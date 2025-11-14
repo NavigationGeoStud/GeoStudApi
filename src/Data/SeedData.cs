@@ -7,33 +7,77 @@ public static class SeedData
 {
     public static async Task SeedAsync(GeoStudDbContext context)
     {
-        if (!context.ServiceClients.Any())
+        // Ensure tgbot service client exists with correct credentials
+        var tgbotClient = await context.ServiceClients
+            .FirstOrDefaultAsync(sc => sc.ClientId == "tgbot" && !sc.IsDeleted);
+        
+        if (tgbotClient == null)
         {
-            var serviceClients = new List<ServiceClient>
+            // Create new tgbot client
+            tgbotClient = new ServiceClient
             {
-                new ServiceClient
-                {
-                    ClientId = "tgbot",
-                    ClientSecret = BCrypt.Net.BCrypt.HashPassword("TgBotSecret"),
-                    ServiceName = "TelegramBot",
-                    Description = "TelegramBot service client",
-                    IsActive = true,
-                    AllowedScopes = "read:surveys,write:surveys,read:analytics"
-                },
-                new ServiceClient
-                {
-                    ClientId = "analytics-service",
-                    ClientSecret = BCrypt.Net.BCrypt.HashPassword("AnalyticsServiceSecret123!"),
-                    ServiceName = "Analytics Service",
-                    Description = "Analytics processing service",
-                    IsActive = true,
-                    AllowedScopes = "read:surveys,read:analytics,write:analytics"
-                }
+                ClientId = "tgbot",
+                ClientSecret = BCrypt.Net.BCrypt.HashPassword("TgBotSecret"),
+                ServiceName = "TelegramBot",
+                Description = "TelegramBot service client",
+                IsActive = true,
+                AllowedScopes = "read:surveys,write:surveys,read:analytics"
             };
-
-            context.ServiceClients.AddRange(serviceClients);
-            await context.SaveChangesAsync();
+            context.ServiceClients.Add(tgbotClient);
         }
+        else
+        {
+            // Update existing client to ensure correct secret hash and active status
+            // Verify the current hash - if it doesn't match, update it
+            var testVerification = BCrypt.Net.BCrypt.Verify("TgBotSecret", tgbotClient.ClientSecret);
+            if (!testVerification)
+            {
+                tgbotClient.ClientSecret = BCrypt.Net.BCrypt.HashPassword("TgBotSecret");
+            }
+            tgbotClient.IsActive = true;
+            if (string.IsNullOrEmpty(tgbotClient.ServiceName))
+            {
+                tgbotClient.ServiceName = "TelegramBot";
+            }
+            if (string.IsNullOrEmpty(tgbotClient.Description))
+            {
+                tgbotClient.Description = "TelegramBot service client";
+            }
+            if (string.IsNullOrEmpty(tgbotClient.AllowedScopes))
+            {
+                tgbotClient.AllowedScopes = "read:surveys,write:surveys,read:analytics";
+            }
+        }
+
+        // Ensure analytics-service client exists
+        var analyticsClient = await context.ServiceClients
+            .FirstOrDefaultAsync(sc => sc.ClientId == "analytics-service" && !sc.IsDeleted);
+        
+        if (analyticsClient == null)
+        {
+            analyticsClient = new ServiceClient
+            {
+                ClientId = "analytics-service",
+                ClientSecret = BCrypt.Net.BCrypt.HashPassword("AnalyticsServiceSecret123!"),
+                ServiceName = "Analytics Service",
+                Description = "Analytics processing service",
+                IsActive = true,
+                AllowedScopes = "read:surveys,read:analytics,write:analytics"
+            };
+            context.ServiceClients.Add(analyticsClient);
+        }
+        else
+        {
+            // Update existing analytics client
+            var testVerification = BCrypt.Net.BCrypt.Verify("AnalyticsServiceSecret123!", analyticsClient.ClientSecret);
+            if (!testVerification)
+            {
+                analyticsClient.ClientSecret = BCrypt.Net.BCrypt.HashPassword("AnalyticsServiceSecret123!");
+            }
+            analyticsClient.IsActive = true;
+        }
+
+        await context.SaveChangesAsync();
         
         // Seed location categories - ensure required categories exist
         var existingCategories = await context.LocationCategories.ToListAsync();
