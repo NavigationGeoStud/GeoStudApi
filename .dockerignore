@@ -1,0 +1,43 @@
+# Build artifacts
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+*.cache
+
+# IDE files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.sln.docstates
+
+# Test files
+**/GetStud.Api.Tests/
+**/*Tests/
+**/*Test*.csproj
+
+# Local development files
+appsettings.Development.json
+appsettings.Local.json
+*.db
+*.db-shm
+*.db-wal
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+*.md
+
+# Misc
+.env
+.env.local
+.DS_Store
+Thumbs.db
+

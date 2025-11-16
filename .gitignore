@@ -240,9 +240,7 @@ Thumbs.db
 .env.production
 
 # Docker
-Dockerfile*
-docker-compose*.yml
-.dockerignore
+
 
 # Database
 *.db
