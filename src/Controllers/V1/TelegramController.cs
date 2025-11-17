@@ -748,18 +748,19 @@ public class TelegramController : ControllerBase
     }
 
     /// <summary>
-    /// Search people with common favorite locations
+    /// Search people with common favorite locations or similar interests
     /// </summary>
     /// <param name="telegramId">Telegram user ID</param>
+    /// <param name="searchBy">Type of search: "locations" (by common favorite locations) or "interests" (by similar interests)</param>
     /// <param name="page">Page number (default: 1)</param>
     /// <param name="pageSize">Page size (default: 20)</param>
-    /// <returns>Paginated list of users with common favorite locations</returns>
+    /// <returns>Paginated list of users with common favorite locations or similar interests</returns>
     [HttpGet("people/search")]
     [ProducesResponseType(typeof(PagedResponse<UserProfileWithLocationsResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> SearchPeople([FromQuery] long telegramId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    public async Task<IActionResult> SearchPeople([FromQuery] long telegramId, [FromQuery] string? searchBy = null, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
         try
         {
@@ -772,7 +773,13 @@ public class TelegramController : ControllerBase
             if (pageSize < 1) pageSize = 20;
             if (pageSize > 100) pageSize = 100;
 
-            var response = await _peopleService.SearchPeopleAsync(telegramId, page, pageSize);
+            // Validate searchBy parameter
+            if (!string.IsNullOrEmpty(searchBy) && searchBy != "locations" && searchBy != "interests")
+            {
+                return BadRequest(new { error = "searchBy parameter must be either 'locations' or 'interests'" });
+            }
+
+            var response = await _peopleService.SearchPeopleAsync(telegramId, searchBy, page, pageSize);
             
             if (response.TotalCount == 0)
             {

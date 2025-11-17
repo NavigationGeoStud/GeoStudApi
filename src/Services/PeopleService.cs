@@ -98,9 +98,32 @@ public class PeopleService : IPeopleService
         };
     }
 
-    public async Task<PagedResponse<UserProfileWithLocationsResponse>> SearchPeopleAsync(long telegramId, int page = 1, int pageSize = 20)
+    public async Task<PagedResponse<UserProfileWithLocationsResponse>> SearchPeopleAsync(long telegramId, string? searchBy = null, int page = 1, int pageSize = 20)
     {
-        _logger.LogDebug("SearchPeopleAsync: telegramId={TelegramId}, page={Page}, pageSize={PageSize}", 
+        _logger.LogDebug("SearchPeopleAsync: telegramId={TelegramId}, searchBy={SearchBy}, page={Page}, pageSize={PageSize}", 
+            telegramId, searchBy, page, pageSize);
+
+        // Default to "locations" if searchBy is not specified
+        if (string.IsNullOrEmpty(searchBy))
+        {
+            searchBy = "locations";
+        }
+
+        // Route to appropriate search method
+        if (searchBy == "interests")
+        {
+            return await SearchPeopleByInterestsAsync(telegramId, page, pageSize);
+        }
+        else
+        {
+            // Default to locations search
+            return await SearchPeopleByLocationsAsync(telegramId, page, pageSize);
+        }
+    }
+
+    public async Task<PagedResponse<UserProfileWithLocationsResponse>> SearchPeopleByLocationsAsync(long telegramId, int page = 1, int pageSize = 20)
+    {
+        _logger.LogDebug("SearchPeopleByLocationsAsync: telegramId={TelegramId}, page={Page}, pageSize={PageSize}", 
             telegramId, page, pageSize);
 
         // Get current user
@@ -227,10 +250,7 @@ public class PeopleService : IPeopleService
                     return loc != null
                         ? new UserProfileWithLocationsResponse.LocationInfo
                         {
-                            Id = loc.Id,
-                            Name = loc.Name,
-                            Address = loc.Address,
-                            CategoryId = loc.CategoryId
+                            Name = loc.Name
                         }
                         : null;
                 })
@@ -252,10 +272,172 @@ public class PeopleService : IPeopleService
         };
     }
 
-    public async Task<PagedResponse<UserProfileWithLocationsResponse>> SearchPeopleByLocationsAsync(long telegramId, int page = 1, int pageSize = 20)
+    public async Task<PagedResponse<UserProfileWithLocationsResponse>> SearchPeopleByInterestsAsync(long telegramId, int page = 1, int pageSize = 20)
     {
-        // This is an alias for SearchPeopleAsync to match the API endpoint name
-        return await SearchPeopleAsync(telegramId, page, pageSize);
+        _logger.LogDebug("SearchPeopleByInterestsAsync: telegramId={TelegramId}, page={Page}, pageSize={PageSize}", 
+            telegramId, page, pageSize);
+
+        // Get current user
+        var currentUser = await _context.Users
+            .FirstOrDefaultAsync(u => u.TelegramId == telegramId && !u.IsDeleted);
+        
+        if (currentUser == null)
+        {
+            _logger.LogWarning("User with TelegramId {TelegramId} not found", telegramId);
+            return new PagedResponse<UserProfileWithLocationsResponse>
+            {
+                Data = new List<UserProfileWithLocationsResponse>(),
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = 0,
+                TotalPages = 0,
+                HasPreviousPage = false,
+                HasNextPage = false
+            };
+        }
+
+        // Get current user's interests and extract categories
+        var currentUserInterests = DeserializeInterests(currentUser.Interests);
+        var currentUserCategories = ExtractInterestCategories(currentUserInterests);
+
+        if (!currentUserCategories.Any())
+        {
+            _logger.LogDebug("User {TelegramId} has no interests", telegramId);
+            return new PagedResponse<UserProfileWithLocationsResponse>
+            {
+                Data = new List<UserProfileWithLocationsResponse>(),
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = 0,
+                TotalPages = 0,
+                HasPreviousPage = false,
+                HasNextPage = false
+            };
+        }
+
+        // Get users who current user has liked/disliked
+        var currentUserLikedIds = await _context.UserLikes
+            .Where(ul => ul.UserId == currentUser.Id && !ul.IsDeleted)
+            .Select(ul => ul.TargetUserId)
+            .ToListAsync();
+
+        var currentUserDislikedIds = await _context.UserDislikes
+            .Where(ud => ud.UserId == currentUser.Id && !ud.IsDeleted)
+            .Select(ud => ud.TargetUserId)
+            .ToListAsync();
+
+        // Get excluded user IDs
+        var excludedUserIds = new HashSet<int> { currentUser.Id }
+            .Union(currentUserLikedIds)
+            .Union(currentUserDislikedIds)
+            .ToList();
+
+        // Get all users with filled profiles and interests
+        var allUsers = await _context.Users
+            .Where(u => !u.IsDeleted && u.IsActive)
+            .Where(u => u.Id != currentUser.Id)
+            .Where(u => !excludedUserIds.Contains(u.Id))
+            .Where(u => u.ProfileDescription != null && 
+                       !string.IsNullOrEmpty(u.ProfileDescription) &&
+                       u.ProfilePhotos != null && 
+                       !string.IsNullOrEmpty(u.ProfilePhotos))
+            .Where(u => u.Interests != null && !string.IsNullOrEmpty(u.Interests))
+            .ToListAsync();
+
+        // Calculate matching interests for each user
+        var usersWithMatchingInterests = allUsers
+            .Select(u =>
+            {
+                var userInterests = DeserializeInterests(u.Interests);
+                var userCategories = ExtractInterestCategories(userInterests);
+                
+                // Count matching categories
+                var matchingCategories = currentUserCategories
+                    .Intersect(userCategories)
+                    .ToList();
+
+                return new
+                {
+                    User = u,
+                    MatchingCategories = matchingCategories,
+                    MatchingCount = matchingCategories.Count
+                };
+            })
+            .Where(x => x.MatchingCount > 0) // Only users with at least one matching category
+            .OrderByDescending(x => x.MatchingCount)
+            .ThenBy(x => x.User.Username)
+            .ToList();
+
+        var totalCount = usersWithMatchingInterests.Count;
+        var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+
+        var pagedUsers = usersWithMatchingInterests
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        // Get favorite locations for paged users to populate matchingLocations
+        var pagedUserIds = pagedUsers.Select(u => u.User.Id).ToList();
+        var currentUserFavoriteLocationIds = await _context.FavoriteLocations
+            .Where(fl => fl.UserId == currentUser.Id && !fl.IsDeleted)
+            .Select(fl => fl.LocationId)
+            .ToListAsync();
+
+        var favoriteLocations = await _context.FavoriteLocations
+            .Where(fl => pagedUserIds.Contains(fl.UserId) && 
+                         currentUserFavoriteLocationIds.Contains(fl.LocationId) && 
+                         !fl.IsDeleted)
+            .Include(fl => fl.Location)
+            .ToListAsync();
+
+        var allLocationIds = favoriteLocations
+            .Select(fl => fl.LocationId)
+            .Distinct()
+            .ToList();
+
+        var locations = await _context.Locations
+            .Where(l => allLocationIds.Contains(l.Id) && !l.IsDeleted)
+            .ToListAsync();
+
+        var profiles = pagedUsers.Select(x =>
+        {
+            var profile = ToUserProfileWithLocationsResponse(x.User);
+            
+            // Get matching locations for this user
+            var userFavoriteLocations = favoriteLocations
+                .Where(fl => fl.UserId == x.User.Id)
+                .Select(fl => fl.LocationId)
+                .Distinct()
+                .ToList();
+
+            profile.MatchingLocations = userFavoriteLocations
+                .Select(locId =>
+                {
+                    var loc = locations.FirstOrDefault(l => l.Id == locId);
+                    return loc != null
+                        ? new UserProfileWithLocationsResponse.LocationInfo
+                        {
+                            Name = loc.Name
+                        }
+                        : null;
+                })
+                .Where(loc => loc != null)
+                .Cast<UserProfileWithLocationsResponse.LocationInfo>()
+                .ToList();
+
+            return profile;
+        }).ToList();
+
+        return new PagedResponse<UserProfileWithLocationsResponse>
+        {
+            Data = profiles,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount,
+            TotalPages = totalPages,
+            HasPreviousPage = page > 1,
+            HasNextPage = page < totalPages
+        };
     }
 
     public async Task<LikeResponse> LikeUserAsync(long telegramId, long targetTelegramId, string? message = null)
@@ -566,6 +748,32 @@ public class PeopleService : IPeopleService
         return string.IsNullOrEmpty(profilePhotosJson) 
             ? new List<string>() 
             : JsonSerializer.Deserialize<List<string>>(profilePhotosJson) ?? new List<string>();
+    }
+
+    /// <summary>
+    /// Extracts interest categories from interests list, ignoring subgenres.
+    /// For example: "theatre:drama" -> "theatre", "movie:comedy" -> "movie", "concerts" -> "concerts"
+    /// </summary>
+    private static HashSet<string> ExtractInterestCategories(List<string> interests)
+    {
+        var categories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        
+        foreach (var interest in interests)
+        {
+            if (string.IsNullOrWhiteSpace(interest))
+                continue;
+
+            // Split by colon to separate category from subgenre
+            var parts = interest.Split(':', StringSplitOptions.RemoveEmptyEntries);
+            var category = parts[0].Trim().ToLowerInvariant();
+            
+            if (!string.IsNullOrEmpty(category))
+            {
+                categories.Add(category);
+            }
+        }
+
+        return categories;
     }
 }
 

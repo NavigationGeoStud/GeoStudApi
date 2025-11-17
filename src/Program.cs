@@ -75,13 +75,15 @@ var forceSqlite = args.Contains("--sqlite") ||
                   args.Contains("--local") ||
                   Environment.GetEnvironmentVariable("FORCE_SQLITE") == "true";
 
-// Force PostgreSQL if connection string is set via Aspire (WithReference)
+// Force PostgreSQL if connection string is set via Aspire (WithReference) or environment variable
 var forcePostgres = isPostgresFromAspire || 
                    Environment.GetEnvironmentVariable("FORCE_POSTGRESQL") == "true";
 
-var useSqlite = forceSqlite && !forcePostgres && 
-                ((builder.Environment.EnvironmentName == "Local" && !isPostgresConnection) ||
-                 (builder.Environment.EnvironmentName == "Development" && !isPostgresConnection));
+// If SQLite is explicitly forced, use it (unless PostgreSQL is also explicitly forced)
+// Otherwise, use SQLite only if in Local/Development environment and no PostgreSQL connection available
+var useSqlite = forceSqlite 
+    ? !forcePostgres  // If SQLite is forced, use it unless PostgreSQL is also forced
+    : ((builder.Environment.EnvironmentName == "Local" || builder.Environment.EnvironmentName == "Development") && !isPostgresConnection);
 
 // Override environment if SQLite arguments are provided
 if (forceSqlite)
@@ -158,6 +160,7 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
         options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
     });
 
 // Database - Configure based on mode
