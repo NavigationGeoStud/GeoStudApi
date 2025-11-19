@@ -13,6 +13,7 @@ using AssignRoleRequest = GeoStud.Api.DTOs.User.AssignRoleRequest;
 using UpdateRoleRequest = GeoStud.Api.DTOs.User.UpdateRoleRequest;
 using CreateLocationTelegramRequest = GeoStud.Api.DTOs.Location.CreateLocationTelegramRequest;
 using UpdateLocationModerationRequest = GeoStud.Api.DTOs.Location.UpdateLocationModerationRequest;
+using MassModerationResponse = GeoStud.Api.DTOs.Location.MassModerationResponse;
 using GeoStud.Api.Models;
 
 namespace GeoStud.Api.Controllers.V1;
@@ -1434,6 +1435,103 @@ public class TelegramController : ControllerBase
         {
             _logger.LogError(ex, "Error deleting location for moderation");
             return StatusCode(500, "Internal server error");
+        }
+    }
+
+    /// <summary>
+    /// Moderate location with AI (only Admin can moderate)
+    /// </summary>
+    /// <param name="locationId">Location ID</param>
+    /// <param name="telegramId">Telegram ID of the admin making the request</param>
+    /// <returns>Updated location response with AI-generated description</returns>
+    [HttpPost("locations/{locationId}/moderate-ai")]
+    [ProducesResponseType(typeof(LocationResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ModerateLocationWithAI(int locationId, [FromQuery] long telegramId)
+    {
+        try
+        {
+            if (telegramId == 0)
+            {
+                return BadRequest(new { error = "telegramId query parameter is required and must be a valid Telegram user ID" });
+            }
+
+            // Check user role - only Admin (2) can moderate with AI
+            var roleResponse = await _roleService.GetUserRoleAsync(telegramId);
+            if (roleResponse == null)
+            {
+                return NotFound(new { error = "User not found" });
+            }
+
+            if (!roleResponse.IsAdmin)
+            {
+                _logger.LogWarning("Unauthorized AI moderation attempt. TelegramId: {TelegramId} is not an admin", telegramId);
+                return StatusCode(403, new { error = "Only administrators can moderate locations with AI" });
+            }
+
+            var location = await _locationService.ModerateLocationWithAIAsync(locationId);
+            if (location == null)
+            {
+                return NotFound(new { error = "Location not found" });
+            }
+
+            return Ok(location);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error moderating location with AI");
+            return StatusCode(500, new { error = "Internal server error", message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Moderate all locations requiring moderation with AI (only Admin can moderate)
+    /// </summary>
+    /// <param name="telegramId">Telegram ID of the admin making the request</param>
+    /// <returns>Mass moderation response with results for all processed locations</returns>
+    [HttpPost("locations/moderate-all-ai")]
+    [ProducesResponseType(typeof(MassModerationResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ModerateAllLocationsWithAI([FromQuery] long telegramId)
+    {
+        try
+        {
+            if (telegramId == 0)
+            {
+                return BadRequest(new { error = "telegramId query parameter is required and must be a valid Telegram user ID" });
+            }
+
+            // Check user role - only Admin (2) can moderate with AI
+            var roleResponse = await _roleService.GetUserRoleAsync(telegramId);
+            if (roleResponse == null)
+            {
+                return NotFound(new { error = "User not found" });
+            }
+
+            if (!roleResponse.IsAdmin)
+            {
+                _logger.LogWarning("Unauthorized mass AI moderation attempt. TelegramId: {TelegramId} is not an admin", telegramId);
+                return StatusCode(403, new { error = "Only administrators can moderate locations with AI" });
+            }
+
+            _logger.LogInformation("Starting mass AI moderation initiated by admin TelegramId: {TelegramId}", telegramId);
+
+            var result = await _locationService.ModerateAllLocationsWithAIAsync();
+
+            _logger.LogInformation("Mass AI moderation completed. Total: {Total}, Success: {Success}, Failed: {Failed}", 
+                result.TotalLocations, result.SuccessfullyModerated, result.Failed);
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error moderating all locations with AI");
+            return StatusCode(500, new { error = "Internal server error", message = ex.Message });
         }
     }
 }

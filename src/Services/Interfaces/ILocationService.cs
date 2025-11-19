@@ -19,5 +19,7 @@ public interface ILocationService
     Task<PagedResponse<LocationResponse>> GetLocationsForModerationAsync(int page = 1, int pageSize = 20);
     Task<LocationResponse?> UpdateLocationForModerationAsync(int id, UpdateLocationModerationRequest request);
     Task<bool> ApproveLocationAsync(int id);
+    Task<LocationResponse?> ModerateLocationWithAIAsync(int locationId);
+    Task<MassModerationResponse> ModerateAllLocationsWithAIAsync();
 }
 

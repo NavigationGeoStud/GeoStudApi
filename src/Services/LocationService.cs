@@ -13,11 +13,13 @@ public class LocationService : ILocationService
 {
     private readonly GeoStudDbContext _context;
     private readonly ILogger<LocationService> _logger;
+    private readonly INeuroApiService _neuroApiService;
 
-    public LocationService(GeoStudDbContext context, ILogger<LocationService> logger)
+    public LocationService(GeoStudDbContext context, ILogger<LocationService> logger, INeuroApiService neuroApiService)
     {
         _context = context;
         _logger = logger;
+        _neuroApiService = neuroApiService;
     }
 
     public async Task<IEnumerable<LocationResponse>> GetLocationsAsync(int? categoryId = null, int? subcategoryId = null, string? city = null)
@@ -704,6 +706,125 @@ public class LocationService : ILocationService
         await _context.SaveChangesAsync();
 
         return true;
+    }
+
+    public async Task<LocationResponse?> ModerateLocationWithAIAsync(int locationId)
+    {
+        var location = await _context.Locations
+            .Include(l => l.Category)
+            .Include(l => l.SubcategoryJoins)
+                .ThenInclude(sj => sj.Subcategory)
+            .FirstOrDefaultAsync(l => l.Id == locationId && !l.IsDeleted);
+
+        if (location == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            _logger.LogInformation("Starting AI moderation for location ID: {LocationId}, Name: {LocationName}", locationId, location.Name);
+
+            // Generate description using NeuroAPI
+            var generatedDescription = await _neuroApiService.GenerateLocationDescriptionAsync(
+                location.Name,
+                location.Description,
+                location.Address,
+                location.City,
+                location.Category?.Name);
+
+            // Update location description
+            location.Description = generatedDescription;
+            location.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Successfully moderated location ID: {LocationId} with AI-generated description", locationId);
+
+            // Reload with all relationships
+            await _context.Entry(location)
+                .Reference(l => l.Category)
+                .LoadAsync();
+            
+            await _context.Entry(location)
+                .Collection(l => l.SubcategoryJoins)
+                .Query()
+                .Include(sj => sj.Subcategory)
+                .LoadAsync();
+
+            return ToLocationResponse(location);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error moderating location ID: {LocationId} with AI", locationId);
+            throw;
+        }
+    }
+
+    public async Task<MassModerationResponse> ModerateAllLocationsWithAIAsync()
+    {
+        var response = new MassModerationResponse();
+        
+        // Get all locations requiring moderation
+        var locationsToModerate = await _context.Locations
+            .Where(l => l.NeedModerate && !l.IsDeleted)
+            .Include(l => l.Category)
+            .OrderBy(l => l.CreatedAt)
+            .ToListAsync();
+
+        response.TotalLocations = locationsToModerate.Count;
+        
+        _logger.LogInformation("Starting mass AI moderation for {Count} locations", response.TotalLocations);
+
+        // Process each location sequentially
+        foreach (var location in locationsToModerate)
+        {
+            var result = new MassModerationResponse.ModerationResult
+            {
+                LocationId = location.Id,
+                LocationName = location.Name
+            };
+
+            try
+            {
+                _logger.LogInformation("Processing location ID: {LocationId}, Name: {LocationName}", location.Id, location.Name);
+
+                // Generate description using NeuroAPI
+                var generatedDescription = await _neuroApiService.GenerateLocationDescriptionAsync(
+                    location.Name,
+                    location.Description,
+                    location.Address,
+                    location.City,
+                    location.Category?.Name);
+
+                // Update location description
+                location.Description = generatedDescription;
+                location.UpdatedAt = DateTime.UtcNow;
+
+                await _context.SaveChangesAsync();
+
+                result.Success = true;
+                result.GeneratedDescription = generatedDescription;
+                response.SuccessfullyModerated++;
+                
+                _logger.LogInformation("Successfully moderated location ID: {LocationId}", location.Id);
+            }
+            catch (Exception ex)
+            {
+                result.Success = false;
+                result.ErrorMessage = ex.Message;
+                response.Failed++;
+                
+                _logger.LogError(ex, "Error moderating location ID: {LocationId} with AI", location.Id);
+            }
+
+            response.Results.Add(result);
+        }
+
+        _logger.LogInformation("Mass AI moderation completed. Total: {Total}, Success: {Success}, Failed: {Failed}", 
+            response.TotalLocations, response.SuccessfullyModerated, response.Failed);
+
+        return response;
     }
 }
 

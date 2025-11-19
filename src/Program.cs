@@ -273,6 +273,8 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<ILocationSuggestionService, LocationSuggestionService>();
 builder.Services.AddHttpClient<WebhookService>();
 builder.Services.AddScoped<IWebhookService, WebhookService>();
+builder.Services.AddHttpClient<NeuroApiService>();
+builder.Services.AddScoped<INeuroApiService, NeuroApiService>();
 
 // Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
