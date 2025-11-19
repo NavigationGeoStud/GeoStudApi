@@ -53,11 +53,13 @@ public class NeuroApiService : INeuroApiService
             var json = JsonSerializer.Serialize(requestBody);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            _logger.LogInformation("Sending request to NeuroAPI for location: {LocationName}", locationName);
-
             var requestUri = _httpClient.BaseAddress != null 
                 ? new Uri(_httpClient.BaseAddress, "/chat/completions")
                 : new Uri($"{ApiBaseUrl}/chat/completions");
+            
+            _logger.LogInformation(
+                "Sending request to NeuroAPI for location: {LocationName}. URL: {Url}, Model: {Model}",
+                locationName, requestUri, requestBody.model);
             
             // Create request message with Authorization header
             var request = new HttpRequestMessage(HttpMethod.Post, requestUri)
@@ -67,25 +69,74 @@ public class NeuroApiService : INeuroApiService
             request.Headers.Add("Authorization", $"Bearer {_apiKey}");
             
             var response = await _httpClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
-
+            
             var responseContent = await response.Content.ReadAsStringAsync();
-            var responseJson = JsonDocument.Parse(responseContent);
+            var contentType = response.Content.Headers.ContentType?.MediaType ?? "unknown";
 
-            var description = responseJson.RootElement
-                .GetProperty("choices")[0]
-                .GetProperty("message")
-                .GetProperty("content")
-                .GetString();
-
-            if (string.IsNullOrWhiteSpace(description))
+            // Check if response is successful
+            if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("NeuroAPI returned empty description for location: {LocationName}", locationName);
+                _logger.LogWarning(
+                    "NeuroAPI returned error status {StatusCode} for location: {LocationName}. Content-Type: {ContentType}, Response: {Response}",
+                    (int)response.StatusCode, locationName, contentType, 
+                    responseContent.Length > 500 ? responseContent.Substring(0, 500) + "..." : responseContent);
                 return existingDescription ?? $"Интересное место в категории {categoryName ?? "развлечений"}.";
             }
 
-            _logger.LogInformation("Successfully generated description for location: {LocationName}", locationName);
-            return description.Trim();
+            // Check if response is JSON
+            if (!contentType.Contains("json", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning(
+                    "NeuroAPI returned non-JSON response for location: {LocationName}. Content-Type: {ContentType}, Response preview: {ResponsePreview}",
+                    locationName, contentType, 
+                    responseContent.Length > 200 ? responseContent.Substring(0, 200) + "..." : responseContent);
+                return existingDescription ?? $"Интересное место в категории {categoryName ?? "развлечений"}.";
+            }
+
+            // Try to parse JSON response
+            JsonDocument? responseJson = null;
+            try
+            {
+                responseJson = JsonDocument.Parse(responseContent);
+            }
+            catch (JsonException jsonEx)
+            {
+                _logger.LogError(jsonEx,
+                    "Failed to parse NeuroAPI JSON response for location: {LocationName}. Response preview: {ResponsePreview}",
+                    locationName, 
+                    responseContent.Length > 500 ? responseContent.Substring(0, 500) + "..." : responseContent);
+                return existingDescription ?? $"Интересное место в категории {categoryName ?? "развлечений"}.";
+            }
+
+            try
+            {
+                var description = responseJson.RootElement
+                    .GetProperty("choices")[0]
+                    .GetProperty("message")
+                    .GetProperty("content")
+                    .GetString();
+
+                if (string.IsNullOrWhiteSpace(description))
+                {
+                    _logger.LogWarning("NeuroAPI returned empty description for location: {LocationName}", locationName);
+                    return existingDescription ?? $"Интересное место в категории {categoryName ?? "развлечений"}.";
+                }
+
+                _logger.LogInformation("Successfully generated description for location: {LocationName}", locationName);
+                return description.Trim();
+            }
+            catch (KeyNotFoundException keyEx)
+            {
+                _logger.LogError(keyEx,
+                    "NeuroAPI response missing expected fields for location: {LocationName}. Response: {Response}",
+                    locationName, 
+                    responseContent.Length > 500 ? responseContent.Substring(0, 500) + "..." : responseContent);
+                return existingDescription ?? $"Интересное место в категории {categoryName ?? "развлечений"}.";
+            }
+            finally
+            {
+                responseJson?.Dispose();
+            }
         }
         catch (Exception ex)
         {
