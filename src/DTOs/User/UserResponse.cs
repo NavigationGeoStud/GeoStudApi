@@ -9,7 +9,8 @@ public class UserResponse
     public string Username { get; set; } = string.Empty;
     public string? FirstName { get; set; }
     public string? Email { get; set; }
-    public string AgeRange { get; set; } = string.Empty;
+    public string? AgeRange { get; set; } // Deprecated, kept for backward compatibility
+    public int? Age { get; set; } // Age as integer (16-100)
     public bool IsStudent { get; set; }
     public string Gender { get; set; } = string.Empty;
     public bool IsLocal { get; set; }

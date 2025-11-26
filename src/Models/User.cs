@@ -23,9 +23,10 @@ public class User : BaseEntity
     public long? TelegramId { get; set; }
     
     // User profile data
-    [Required]
     [MaxLength(20)]
-    public string AgeRange { get; set; } = string.Empty; // "17-22", "23-25", "26-30", "30+"
+    public string? AgeRange { get; set; } // "17-22", "23-25", "26-30", "30+" (deprecated, kept for backward compatibility)
+    
+    public int? Age { get; set; } // Age as integer (16-100)
     
     [Required]
     public bool IsStudent { get; set; }
@@ -50,7 +51,7 @@ public class User : BaseEntity
     
     [Required]
     [MaxLength(50)]
-    public string SocialPreference { get; set; } = string.Empty; // "Alone", "Couple", "Group", "Party"
+    public string SocialPreference { get; set; } = string.Empty; // "Alone", "Couple", "Group", "Party", "male", "female", "any", "alone"
     
     public bool IsActive { get; set; } = true;
     public DateTime? LastLoginAt { get; set; }
