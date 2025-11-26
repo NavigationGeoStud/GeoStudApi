@@ -1,6 +1,6 @@
 using GeoStud.Api.Models;
 using GeoStud.Api.DTOs.Auth;
-using GeoStud.Api.DTOs.Survey;
+using GeoStud.Api.DTOs.User;
 using GeoStud.Api.DTOs.Analytics;
 
 namespace GetStud.Api.Tests;
@@ -51,49 +51,7 @@ public class ModelTests
         Assert.Equal(lastUsedAt, client.LastUsedAt);
     }
 
-    [Fact]
-    public void Student_DefaultValues_ShouldBeCorrect()
-    {
-        // Arrange & Act
-        var student = new Student();
-
-        // Assert
-        Assert.Equal(0, student.Id);
-        Assert.Null(student.FirstName); // FirstName is nullable
-        Assert.Null(student.LastName); // LastName is nullable
-        Assert.Equal(string.Empty, student.Email);
-        Assert.True(student.CreatedAt > DateTime.MinValue);
-        Assert.Null(student.UpdatedAt);
-    }
-
-    [Fact]
-    public void Student_CanSetAndGetProperties()
-    {
-        // Arrange
-        var student = new Student();
-        var id = 1;
-        var firstName = "John";
-        var lastName = "Doe";
-        var email = "john.doe@example.com";
-        var createdAt = DateTime.UtcNow;
-        var updatedAt = DateTime.UtcNow;
-
-        // Act
-        student.Id = id;
-        student.FirstName = firstName;
-        student.LastName = lastName;
-        student.Email = email;
-        student.CreatedAt = createdAt;
-        student.UpdatedAt = updatedAt;
-
-        // Assert
-        Assert.Equal(id, student.Id);
-        Assert.Equal(firstName, student.FirstName);
-        Assert.Equal(lastName, student.LastName);
-        Assert.Equal(email, student.Email);
-        Assert.True(student.CreatedAt > DateTime.MinValue);
-        Assert.Equal(updatedAt, student.UpdatedAt);
-    }
+    // Student model was removed - tests removed
 
     [Fact]
     public void ServiceAuthRequest_DefaultValues_ShouldBeEmpty()
@@ -164,13 +122,15 @@ public class ModelTests
     }
 
     [Fact]
-    public void SurveyRequest_DefaultValues_ShouldBeCorrect()
+    public void UserRequest_DefaultValues_ShouldBeCorrect()
     {
         // Arrange & Act
-        var request = new SurveyRequest();
+        var request = new UserRequest();
 
         // Assert
-        Assert.Equal(string.Empty, request.AgeRange);
+        Assert.Equal(string.Empty, request.Username);
+        Assert.Null(request.AgeRange); // Now nullable
+        Assert.Null(request.Age); // New field
         Assert.False(request.IsStudent);
         Assert.Equal(string.Empty, request.Gender);
         Assert.False(request.IsLocal);
@@ -181,21 +141,23 @@ public class ModelTests
     }
 
     [Fact]
-    public void SurveyRequest_CanSetAndGetProperties()
+    public void UserRequest_CanSetAndGetProperties()
     {
         // Arrange
-        var request = new SurveyRequest();
-        var ageRange = "18-25";
+        var request = new UserRequest();
+        var username = "test_user";
+        var age = 25;
         var isStudent = true;
         var gender = "Male";
         var isLocal = true;
-        var interests = new List<string> { "Sports", "Music" };
-        var budget = "100-500";
+        var interests = new List<string> { "theatre", "movie" };
+        var budget = "500";
         var activityTime = "Evening";
-        var socialPreference = "Group";
+        var socialPreference = "male";
 
         // Act
-        request.AgeRange = ageRange;
+        request.Username = username;
+        request.Age = age;
         request.IsStudent = isStudent;
         request.Gender = gender;
         request.IsLocal = isLocal;
@@ -205,7 +167,8 @@ public class ModelTests
         request.SocialPreference = socialPreference;
 
         // Assert
-        Assert.Equal(ageRange, request.AgeRange);
+        Assert.Equal(username, request.Username);
+        Assert.Equal(age, request.Age);
         Assert.Equal(isStudent, request.IsStudent);
         Assert.Equal(gender, request.Gender);
         Assert.Equal(isLocal, request.IsLocal);
@@ -216,16 +179,16 @@ public class ModelTests
     }
 
     [Fact]
-    public void SurveyResponse_DefaultValues_ShouldBeCorrect()
+    public void UserResponse_DefaultValues_ShouldBeCorrect()
     {
         // Arrange & Act
-        var response = new SurveyResponse();
+        var response = new UserResponse();
 
         // Assert
-        Assert.Equal(0, response.StudentId);
+        Assert.Equal(0, response.UserId);
         Assert.Equal(string.Empty, response.Username);
-        Assert.Equal(string.Empty, response.Email);
-        Assert.Equal(string.Empty, response.AgeRange);
+        Assert.Null(response.AgeRange); // Now nullable
+        Assert.Null(response.Age); // New field
         Assert.False(response.IsStudent);
         Assert.Equal(string.Empty, response.Gender);
         Assert.False(response.IsLocal);
@@ -237,28 +200,26 @@ public class ModelTests
     }
 
     [Fact]
-    public void SurveyResponse_CanSetAndGetProperties()
+    public void UserResponse_CanSetAndGetProperties()
     {
         // Arrange
-        var response = new SurveyResponse();
-        var studentId = 1;
+        var response = new UserResponse();
+        var userId = 1;
         var username = "john_doe";
-        var email = "john@example.com";
-        var ageRange = "18-25";
+        var age = 25;
         var isStudent = true;
         var gender = "Male";
         var isLocal = true;
-        var interests = new List<string> { "Sports", "Music" };
-        var budget = "100-500";
+        var interests = new List<string> { "theatre", "movie" };
+        var budget = "500";
         var activityTime = "Evening";
-        var socialPreference = "Group";
+        var socialPreference = "male";
         var createdAt = DateTime.UtcNow;
 
         // Act
-        response.StudentId = studentId;
+        response.UserId = userId;
         response.Username = username;
-        response.Email = email;
-        response.AgeRange = ageRange;
+        response.Age = age;
         response.IsStudent = isStudent;
         response.Gender = gender;
         response.IsLocal = isLocal;
@@ -269,10 +230,9 @@ public class ModelTests
         response.CreatedAt = createdAt;
 
         // Assert
-        Assert.Equal(studentId, response.StudentId);
+        Assert.Equal(userId, response.UserId);
         Assert.Equal(username, response.Username);
-        Assert.Equal(email, response.Email);
-        Assert.Equal(ageRange, response.AgeRange);
+        Assert.Equal(age, response.Age);
         Assert.Equal(isStudent, response.IsStudent);
         Assert.Equal(gender, response.Gender);
         Assert.Equal(isLocal, response.IsLocal);

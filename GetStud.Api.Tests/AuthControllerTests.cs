@@ -4,6 +4,7 @@ using Moq;
 using GeoStud.Api.Controllers.V1;
 using GeoStud.Api.DTOs.Auth;
 using GeoStud.Api.Services;
+using GeoStud.Api.Services.Interfaces;
 
 namespace GetStud.Api.Tests;
 
