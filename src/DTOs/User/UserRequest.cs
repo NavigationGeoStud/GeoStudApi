@@ -13,9 +13,11 @@ public class UserRequest
     
     public long? TelegramId { get; set; }
     
-    [Required]
     [MaxLength(20)]
-    public string AgeRange { get; set; } = string.Empty;
+    public string? AgeRange { get; set; } // Deprecated, kept for backward compatibility
+    
+    [Range(16, 100)]
+    public int? Age { get; set; } // Age as integer (16-100)
     
     [Required]
     public bool IsStudent { get; set; }

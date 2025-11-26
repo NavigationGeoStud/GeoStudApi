@@ -5,6 +5,7 @@ using GeoStud.Api.DTOs.User;
 using UserResponseDto = GeoStud.Api.DTOs.User.UserResponse;
 using GeoStud.Api.Models;
 using GeoStud.Api.Services.Interfaces;
+using GeoStud.Api.Helpers;
 
 namespace GeoStud.Api.Services;
 
@@ -46,11 +47,28 @@ public class UserService : IUserService
                 existingUser.FirstName = request.FirstName;
             }
             existingUser.TelegramId = request.TelegramId;
-            existingUser.AgeRange = request.AgeRange;
+            // Handle age: prefer Age over AgeRange, but support both for backward compatibility
+            if (request.Age.HasValue)
+            {
+                existingUser.Age = request.Age.Value;
+                // Optionally clear AgeRange if Age is provided
+                if (string.IsNullOrEmpty(request.AgeRange))
+                {
+                    existingUser.AgeRange = null;
+                }
+            }
+            else if (!string.IsNullOrEmpty(request.AgeRange))
+            {
+                existingUser.AgeRange = request.AgeRange;
+                // Try to extract age from range if possible (for backward compatibility)
+                existingUser.Age = ExtractAgeFromRange(request.AgeRange);
+            }
             existingUser.IsStudent = request.IsStudent;
             existingUser.Gender = request.Gender;
             existingUser.IsLocal = request.IsLocal;
-            existingUser.Interests = JsonSerializer.Serialize(request.Interests);
+            // Expand categories to subcategories automatically
+            var expandedInterests = InterestCategoryHelper.ExpandCategoriesToSubcategories(request.Interests);
+            existingUser.Interests = JsonSerializer.Serialize(expandedInterests);
             existingUser.Budget = request.Budget;
             existingUser.ActivityTime = request.ActivityTime;
             existingUser.SocialPreference = request.SocialPreference;
@@ -68,11 +86,14 @@ public class UserService : IUserService
                 Email = null, // Not required for Telegram users
                 PasswordHash = null, // Not required for Telegram users
                 TelegramId = request.TelegramId,
-                AgeRange = request.AgeRange,
+                // Handle age: prefer Age over AgeRange, but support both for backward compatibility
+                Age = request.Age ?? ExtractAgeFromRange(request.AgeRange),
+                AgeRange = request.AgeRange, // Keep for backward compatibility
                 IsStudent = request.IsStudent,
                 Gender = request.Gender,
                 IsLocal = request.IsLocal,
-                Interests = JsonSerializer.Serialize(request.Interests),
+                // Expand categories to subcategories automatically
+                Interests = JsonSerializer.Serialize(InterestCategoryHelper.ExpandCategoriesToSubcategories(request.Interests)),
                 Budget = request.Budget,
                 ActivityTime = request.ActivityTime,
                 SocialPreference = request.SocialPreference,
@@ -185,9 +206,21 @@ public class UserService : IUserService
             hasChanges = true;
         }
 
-        if (!string.IsNullOrEmpty(request.AgeRange) && user.AgeRange != request.AgeRange)
+        // Handle age: prefer Age over AgeRange, but support both for backward compatibility
+        if (request.Age.HasValue && user.Age != request.Age.Value)
+        {
+            user.Age = request.Age.Value;
+            hasChanges = true;
+        }
+        else if (!string.IsNullOrEmpty(request.AgeRange) && user.AgeRange != request.AgeRange)
         {
             user.AgeRange = request.AgeRange;
+            // Try to extract age from range if possible (for backward compatibility)
+            var extractedAge = ExtractAgeFromRange(request.AgeRange);
+            if (extractedAge.HasValue && user.Age != extractedAge.Value)
+            {
+                user.Age = extractedAge.Value;
+            }
             hasChanges = true;
         }
 
@@ -211,7 +244,9 @@ public class UserService : IUserService
 
         if (request.Interests != null)
         {
-            var newInterestsJson = JsonSerializer.Serialize(request.Interests);
+            // Expand categories to subcategories automatically
+            var expandedInterests = InterestCategoryHelper.ExpandCategoriesToSubcategories(request.Interests);
+            var newInterestsJson = JsonSerializer.Serialize(expandedInterests);
             if (user.Interests != newInterestsJson)
             {
                 user.Interests = newInterestsJson;
@@ -304,9 +339,21 @@ public class UserService : IUserService
             hasChanges = true;
         }
 
-        if (!string.IsNullOrEmpty(request.AgeRange) && user.AgeRange != request.AgeRange)
+        // Handle age: prefer Age over AgeRange, but support both for backward compatibility
+        if (request.Age.HasValue && user.Age != request.Age.Value)
+        {
+            user.Age = request.Age.Value;
+            hasChanges = true;
+        }
+        else if (!string.IsNullOrEmpty(request.AgeRange) && user.AgeRange != request.AgeRange)
         {
             user.AgeRange = request.AgeRange;
+            // Try to extract age from range if possible (for backward compatibility)
+            var extractedAge = ExtractAgeFromRange(request.AgeRange);
+            if (extractedAge.HasValue && user.Age != extractedAge.Value)
+            {
+                user.Age = extractedAge.Value;
+            }
             hasChanges = true;
         }
 
@@ -330,7 +377,9 @@ public class UserService : IUserService
 
         if (request.Interests != null)
         {
-            var newInterestsJson = JsonSerializer.Serialize(request.Interests);
+            // Expand categories to subcategories automatically
+            var expandedInterests = InterestCategoryHelper.ExpandCategoriesToSubcategories(request.Interests);
+            var newInterestsJson = JsonSerializer.Serialize(expandedInterests);
             if (user.Interests != newInterestsJson)
             {
                 user.Interests = newInterestsJson;
@@ -405,11 +454,21 @@ public class UserService : IUserService
 
         // Update all fields
         user.TelegramId = request.TelegramId;
-        user.AgeRange = request.AgeRange;
+        // Handle age: prefer Age over AgeRange, but support both for backward compatibility
+        if (request.Age.HasValue)
+        {
+            user.Age = request.Age.Value;
+        }
+        else if (!string.IsNullOrEmpty(request.AgeRange))
+        {
+            user.AgeRange = request.AgeRange;
+            user.Age = ExtractAgeFromRange(request.AgeRange);
+        }
         user.IsStudent = request.IsStudent;
         user.Gender = request.Gender;
         user.IsLocal = request.IsLocal;
-        user.Interests = JsonSerializer.Serialize(request.Interests);
+        // Expand categories to subcategories automatically
+        user.Interests = JsonSerializer.Serialize(InterestCategoryHelper.ExpandCategoriesToSubcategories(request.Interests));
         user.Budget = request.Budget;
         user.ActivityTime = request.ActivityTime;
         user.SocialPreference = request.SocialPreference;
@@ -439,7 +498,6 @@ public class UserService : IUserService
     {
         var responses = new List<UserAnalyticsResponse>
         {
-            new() { UserId = userId, Question = "Age Range", Answer = request.AgeRange, Category = "Demographics" },
             new() { UserId = userId, Question = "Is Student", Answer = request.IsStudent.ToString(), Category = "Demographics" },
             new() { UserId = userId, Question = "Gender", Answer = request.Gender, Category = "Demographics" },
             new() { UserId = userId, Question = "Is Local", Answer = request.IsLocal.ToString(), Category = "Demographics" },
@@ -448,6 +506,30 @@ public class UserService : IUserService
             new() { UserId = userId, Question = "Activity Time", Answer = request.ActivityTime, Category = "Behavior" },
             new() { UserId = userId, Question = "Social Preference", Answer = request.SocialPreference, Category = "Behavior" }
         };
+
+        // Add Age if provided
+        if (request.Age.HasValue)
+        {
+            responses.Add(new UserAnalyticsResponse
+            {
+                UserId = userId,
+                Question = "Age",
+                Answer = request.Age.Value.ToString(),
+                Category = "Demographics"
+            });
+        }
+
+        // Add Age Range if provided (for backward compatibility)
+        if (!string.IsNullOrEmpty(request.AgeRange))
+        {
+            responses.Add(new UserAnalyticsResponse
+            {
+                UserId = userId,
+                Question = "Age Range",
+                Answer = request.AgeRange,
+                Category = "Demographics"
+            });
+        }
 
         _context.UserAnalyticsResponses.AddRange(responses);
         await _context.SaveChangesAsync();
@@ -460,7 +542,28 @@ public class UserService : IUserService
             .Where(r => r.UserId == userId && !r.IsDeleted)
             .ToListAsync();
 
-        // Update or create Age Range
+        // Update or create Age
+        if (request.Age.HasValue)
+        {
+            var response = existingResponses.FirstOrDefault(r => r.Question == "Age");
+            if (response != null)
+            {
+                response.Answer = request.Age.Value.ToString();
+                response.UpdatedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                _context.UserAnalyticsResponses.Add(new UserAnalyticsResponse
+                {
+                    UserId = userId,
+                    Question = "Age",
+                    Answer = request.Age.Value.ToString(),
+                    Category = "Demographics"
+                });
+            }
+        }
+
+        // Update or create Age Range (for backward compatibility)
         if (!string.IsNullOrEmpty(request.AgeRange))
         {
             var response = existingResponses.FirstOrDefault(r => r.Question == "Age Range");
@@ -641,6 +744,7 @@ public class UserService : IUserService
             FirstName = user.FirstName,
             Email = user.Email,
             AgeRange = user.AgeRange,
+            Age = user.Age,
             IsStudent = user.IsStudent,
             Gender = user.Gender,
             IsLocal = user.IsLocal,
@@ -668,6 +772,44 @@ public class UserService : IUserService
         return string.IsNullOrEmpty(profilePhotosJson) 
             ? new List<string>() 
             : JsonSerializer.Deserialize<List<string>>(profilePhotosJson) ?? new List<string>();
+    }
+
+    /// <summary>
+    /// Extracts age from age range string (for backward compatibility)
+    /// Examples: "17-22" -> 19 (middle), "23-25" -> 24, "30+" -> 30
+    /// </summary>
+    private static int? ExtractAgeFromRange(string? ageRange)
+    {
+        if (string.IsNullOrWhiteSpace(ageRange))
+            return null;
+
+        // Handle "30+" format
+        if (ageRange.EndsWith("+"))
+        {
+            if (int.TryParse(ageRange.TrimEnd('+'), out var minAge))
+            {
+                return minAge;
+            }
+        }
+
+        // Handle "17-22" format
+        var parts = ageRange.Split('-');
+        if (parts.Length == 2)
+        {
+            if (int.TryParse(parts[0].Trim(), out var min) && int.TryParse(parts[1].Trim(), out var max))
+            {
+                // Return middle of the range
+                return (min + max) / 2;
+            }
+        }
+
+        // Try to parse as single number
+        if (int.TryParse(ageRange.Trim(), out var singleAge))
+        {
+            return singleAge;
+        }
+
+        return null;
     }
 }
 
