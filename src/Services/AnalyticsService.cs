@@ -45,15 +45,15 @@ public class AnalyticsService : IAnalyticsService
     {
         var totalCount = await _context.Users.CountAsync(s => !s.IsDeleted);
 
-        // Age distribution
+        // Age distribution (using AgeRange for backward compatibility, but prefer Age if available)
         var ageDistribution = await _context.Users
-            .Where(s => !s.IsDeleted)
+            .Where(s => !s.IsDeleted && s.AgeRange != null)
             .GroupBy(s => s.AgeRange)
             .Select(g => new AnalyticsResponse
             {
                 MetricName = "Age Distribution",
                 Category = "Demographics",
-                Value = g.Key,
+                Value = g.Key ?? "Unknown",
                 Count = g.Count(),
                 Percentage = Math.Round((double)g.Count() / totalCount * 100, 2),
                 CalculatedAt = DateTime.UtcNow
