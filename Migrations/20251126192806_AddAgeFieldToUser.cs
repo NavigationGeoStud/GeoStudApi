@@ -5,25 +5,27 @@
 namespace GeoStud.Api.Migrations
 {
     /// <inheritdoc />
-    public partial class UpdateUserModel : Migration
+    public partial class AddAgeFieldToUser : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // Add Age column - works for both SQLite and PostgreSQL
+            // Add Age column
             migrationBuilder.AddColumn<int>(
                 name: "Age",
                 table: "Users",
+                type: "integer",
                 nullable: true);
 
-            // Make AgeRange nullable - works for both SQLite and PostgreSQL
-            // EF Core will handle the type conversion based on the provider
+            // Make AgeRange nullable
             migrationBuilder.AlterColumn<string>(
                 name: "AgeRange",
                 table: "Users",
+                type: "character varying(20)",
                 maxLength: 20,
                 nullable: true,
                 oldClrType: typeof(string),
+                oldType: "character varying(20)",
                 oldMaxLength: 20,
                 oldNullable: false);
         }
@@ -37,13 +39,14 @@ namespace GeoStud.Api.Migrations
                 table: "Users");
 
             // Restore AgeRange as required (non-nullable)
-            // Note: For existing data, you may need to set a default value before making it non-nullable
             migrationBuilder.AlterColumn<string>(
                 name: "AgeRange",
                 table: "Users",
+                type: "character varying(20)",
                 maxLength: 20,
                 nullable: false,
                 oldClrType: typeof(string),
+                oldType: "character varying(20)",
                 oldMaxLength: 20,
                 oldNullable: true);
         }

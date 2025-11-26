@@ -6,6 +6,7 @@ using System.Text;
 using GeoStud.Api.Data;
 using GeoStud.Api.Services;
 using GeoStud.Api.Services.Interfaces;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -413,6 +414,47 @@ using (var scope = app.Services.CreateScope())
         else
         {
             Console.WriteLine("✅ Database is up to date");
+        }
+    }
+    catch (PostgresException pgEx) when (pgEx.SqlState == "42P07") // relation already exists
+    {
+        // Tables exist but migration history is missing - mark migrations as applied
+        Console.WriteLine($"⚠️ Tables already exist but migration history is incomplete. Marking migrations as applied...");
+        try
+        {
+            var appliedMigrations = context.Database.GetAppliedMigrations().ToList();
+            var allMigrations = context.Database.GetMigrations().ToList();
+            
+            var connection = context.Database.GetDbConnection();
+            if (connection.State != System.Data.ConnectionState.Open)
+            {
+                await connection.OpenAsync();
+            }
+            
+            foreach (var migration in allMigrations)
+            {
+                if (!appliedMigrations.Contains(migration))
+                {
+                    using var command = connection.CreateCommand();
+                    command.CommandText = $@"
+                        INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"")
+                        SELECT '{migration}', '9.0.0'
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM ""__EFMigrationsHistory"" 
+                            WHERE ""MigrationId"" = '{migration}'
+                        );";
+                    await command.ExecuteNonQueryAsync();
+                    Console.WriteLine($"  ✓ Marked migration '{migration}' as applied");
+                }
+            }
+            
+            Console.WriteLine("✅ Migration history synchronized");
+        }
+        catch (Exception syncEx)
+        {
+            Console.WriteLine($"❌ Failed to sync migration history: {syncEx.Message}");
+            Console.WriteLine("💡 You may need to manually run the MarkMigrationsAsApplied.sql script");
+            throw;
         }
     }
     catch (Exception ex)

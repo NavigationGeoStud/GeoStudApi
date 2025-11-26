@@ -10,11 +10,10 @@ namespace GeoStud.Api.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // Add NeedModerate column - EF Core will handle type conversion
-            // PostgreSQL uses 'boolean', SQLite uses 'INTEGER'
             migrationBuilder.AddColumn<bool>(
                 name: "NeedModerate",
                 table: "Locations",
+                type: "boolean",
                 nullable: false,
                 defaultValue: false);
         }
