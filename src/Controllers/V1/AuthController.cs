@@ -1,12 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using GeoStud.Api.DTOs.Auth;
-using GeoStud.Api.Services;
+using GeoStud.Api.Services.Interfaces;
 
 namespace GeoStud.Api.Controllers.V1;
 
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
+[Tags("General")]
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
@@ -47,8 +48,12 @@ public class AuthController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during service login");
-            return StatusCode(500, "Internal server error");
+            _logger.LogError(ex, "Error during service login: {Message}", ex.Message);
+            return StatusCode(500, new { 
+                error = "Internal server error", 
+                message = ex.Message,
+                details = ex.StackTrace
+            });
         }
     }
 

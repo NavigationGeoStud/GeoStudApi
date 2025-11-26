@@ -109,7 +109,9 @@ public class AuthControllerTests
         // Check if the response has a 'valid' property
         var validProperty = response.GetType().GetProperty("valid");
         Assert.NotNull(validProperty);
-        Assert.True((bool)validProperty.GetValue(response));
+        var validValue = validProperty.GetValue(response);
+        Assert.NotNull(validValue);
+        Assert.True((bool)validValue);
     }
 
     [Fact]

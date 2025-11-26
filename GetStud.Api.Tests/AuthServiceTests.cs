@@ -32,6 +32,11 @@ public class AuthServiceTests : IDisposable
         _mockConfiguration.Setup(x => x["Jwt:Issuer"]).Returns("GeoStudApi");
         _mockConfiguration.Setup(x => x["Jwt:Audience"]).Returns("GeoStudApiUsers");
         _mockConfiguration.Setup(x => x["Jwt:ExpirationMinutes"]).Returns("60");
+        
+        // Setup for GetValue<int> method
+        var configSectionMock = new Mock<IConfigurationSection>();
+        configSectionMock.Setup(x => x.Value).Returns("60");
+        _mockConfiguration.Setup(x => x.GetSection("Jwt:ExpirationMinutes")).Returns(configSectionMock.Object);
 
         _mockLogger = new Mock<ILogger<AuthService>>();
 

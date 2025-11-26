@@ -240,9 +240,7 @@ Thumbs.db
 .env.production
 
 # Docker
-Dockerfile*
-docker-compose*.yml
-.dockerignore
+
 
 # Database
 *.db
@@ -255,3 +253,6 @@ logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+GeoStudLocal.db-shm
+GeoStudLocal.db-shm
+GeoStudLocal.db-wal
