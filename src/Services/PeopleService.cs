@@ -103,22 +103,209 @@ public class PeopleService : IPeopleService
         _logger.LogDebug("SearchPeopleAsync: telegramId={TelegramId}, searchBy={SearchBy}, page={Page}, pageSize={PageSize}", 
             telegramId, searchBy, page, pageSize);
 
-        // Default to "locations" if searchBy is not specified
-        if (string.IsNullOrEmpty(searchBy))
-        {
-            searchBy = "locations";
-        }
-
         // Route to appropriate search method
-        if (searchBy == "interests")
+        if (searchBy == "all")
+        {
+            return await SearchAllPeopleAsync(telegramId, page, pageSize);
+        }
+        else if (searchBy == "interests")
         {
             return await SearchPeopleByInterestsAsync(telegramId, page, pageSize);
         }
-        else
+        else if (searchBy == "locations")
         {
-            // Default to locations search
+            // Поиск по локациям - только люди с общими локациями
             return await SearchPeopleByLocationsAsync(telegramId, page, pageSize);
         }
+        else
+        {
+            // Default: комбинированный поиск - сначала люди с общими локациями, потом с общими интересами (2+ категории)
+            // Это основной режим поиска
+            return await SearchPeopleCombinedAsync(telegramId, page, pageSize);
+        }
+    }
+
+    /// <summary>
+    /// Combined search: сначала люди с общими локациями, потом с общими интересами (2+ категории)
+    /// </summary>
+    private async Task<PagedResponse<UserProfileWithLocationsResponse>> SearchPeopleCombinedAsync(long telegramId, int page = 1, int pageSize = 20)
+    {
+        _logger.LogDebug("SearchPeopleCombinedAsync: telegramId={TelegramId}, page={Page}, pageSize={PageSize}", 
+            telegramId, page, pageSize);
+
+        // Get current user
+        var currentUser = await _context.Users
+            .FirstOrDefaultAsync(u => u.TelegramId == telegramId && !u.IsDeleted);
+        
+        if (currentUser == null)
+        {
+            _logger.LogWarning("User with TelegramId {TelegramId} not found", telegramId);
+            return new PagedResponse<UserProfileWithLocationsResponse>
+            {
+                Data = new List<UserProfileWithLocationsResponse>(),
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = 0,
+                TotalPages = 0,
+                HasPreviousPage = false,
+                HasNextPage = false
+            };
+        }
+
+        // Get excluded user IDs
+        var currentUserLikedIds = await _context.UserLikes
+            .Where(ul => ul.UserId == currentUser.Id && !ul.IsDeleted)
+            .Select(ul => ul.TargetUserId)
+            .ToListAsync();
+
+        var currentUserDislikedIds = await _context.UserDislikes
+            .Where(ud => ud.UserId == currentUser.Id && !ud.IsDeleted)
+            .Select(ud => ud.TargetUserId)
+            .ToListAsync();
+
+        var excludedUserIds = new HashSet<int> { currentUser.Id }
+            .Union(currentUserLikedIds)
+            .Union(currentUserDislikedIds)
+            .ToList();
+
+        var allResults = new List<(User User, int Priority, List<int> CommonLocationIds, int MatchingCategoryCount)>();
+
+        // 1. Get users with common locations (Priority 1 - highest)
+        var currentUserFavoriteLocationIds = await _context.FavoriteLocations
+            .Where(fl => fl.UserId == currentUser.Id && !fl.IsDeleted)
+            .Select(fl => fl.LocationId)
+            .ToListAsync();
+
+        if (currentUserFavoriteLocationIds.Any())
+        {
+            var favoriteLocationsQuery = _context.FavoriteLocations
+                .Where(fl => currentUserFavoriteLocationIds.Contains(fl.LocationId) && !fl.IsDeleted)
+                .Where(fl => !excludedUserIds.Contains(fl.UserId))
+                .Include(fl => fl.User)
+                .Where(fl => fl.User != null && !fl.User.IsDeleted && fl.User.IsActive)
+                .Where(fl => fl.User!.ProfileDescription != null && 
+                            !string.IsNullOrEmpty(fl.User.ProfileDescription) &&
+                            fl.User.ProfilePhotos != null && 
+                            !string.IsNullOrEmpty(fl.User.ProfilePhotos));
+
+            var favoriteLocations = await favoriteLocationsQuery.ToListAsync();
+
+            var usersWithCommonLocations = favoriteLocations
+                .GroupBy(fl => fl.UserId)
+                .Select(g => new
+                {
+                    User = g.First().User!,
+                    CommonLocationIds = g.Select(fl => fl.LocationId).Distinct().ToList()
+                })
+                .Where(x => AreUsersGenderCompatible(currentUser, x.User))
+                .ToList();
+
+            foreach (var item in usersWithCommonLocations)
+            {
+                allResults.Add((item.User, 1, item.CommonLocationIds, 0));
+                excludedUserIds.Add(item.User.Id); // Exclude from interests search
+            }
+        }
+
+        // 2. Get users with common interests (2+ categories) (Priority 2)
+        var currentUserInterests = DeserializeInterests(currentUser.Interests);
+        var currentUserCategories = ExtractInterestCategories(currentUserInterests);
+
+        if (currentUserCategories.Any())
+        {
+            var allUsers = await _context.Users
+                .Where(u => !u.IsDeleted && u.IsActive)
+                .Where(u => u.Id != currentUser.Id)
+                .Where(u => !excludedUserIds.Contains(u.Id))
+                .Where(u => u.ProfileDescription != null && 
+                           !string.IsNullOrEmpty(u.ProfileDescription) &&
+                           u.ProfilePhotos != null && 
+                           !string.IsNullOrEmpty(u.ProfilePhotos))
+                .Where(u => u.Interests != null && !string.IsNullOrEmpty(u.Interests))
+                .ToListAsync();
+
+            var usersWithMatchingInterests = allUsers
+                .Where(u => AreUsersGenderCompatible(currentUser, u))
+                .Select(u =>
+                {
+                    var userInterests = DeserializeInterests(u.Interests);
+                    var userCategories = ExtractInterestCategories(userInterests);
+                    var matchingCategories = currentUserCategories.Intersect(userCategories).ToList();
+                    return new
+                    {
+                        User = u,
+                        MatchingCount = matchingCategories.Count
+                    };
+                })
+                .Where(x => x.MatchingCount >= 2) // Минимум 2 категории
+                .OrderByDescending(x => x.MatchingCount)
+                .ThenBy(x => x.User.Username)
+                .ToList();
+
+            foreach (var item in usersWithMatchingInterests)
+            {
+                allResults.Add((item.User, 2, new List<int>(), item.MatchingCount));
+            }
+        }
+
+        // Sort: Priority 1 (locations) first, then Priority 2 (interests)
+        var sortedResults = allResults
+            .OrderBy(x => x.Priority)
+            .ThenByDescending(x => x.MatchingCategoryCount)
+            .ThenBy(x => x.User.Username)
+            .ToList();
+
+        var totalCount = sortedResults.Count;
+        var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+
+        var pagedResults = sortedResults
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        // Get location details
+        var allLocationIds = pagedResults
+            .SelectMany(r => r.CommonLocationIds)
+            .Distinct()
+            .ToList();
+
+        var locations = allLocationIds.Any()
+            ? await _context.Locations
+                .Where(l => allLocationIds.Contains(l.Id) && !l.IsDeleted)
+                .ToListAsync()
+            : new List<Location>();
+
+        // Build response
+        var profiles = pagedResults.Select(r =>
+        {
+            var profile = ToUserProfileWithLocationsResponse(r.User);
+            profile.MatchingLocations = r.CommonLocationIds
+                .Select(locId =>
+                {
+                    var loc = locations.FirstOrDefault(l => l.Id == locId);
+                    return loc != null
+                        ? new UserProfileWithLocationsResponse.LocationInfo
+                        {
+                            Name = loc.Name
+                        }
+                        : null;
+                })
+                .Where(loc => loc != null)
+                .Cast<UserProfileWithLocationsResponse.LocationInfo>()
+                .ToList();
+            return profile;
+        }).ToList();
+
+        return new PagedResponse<UserProfileWithLocationsResponse>
+        {
+            Data = profiles,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount,
+            TotalPages = totalPages,
+            HasPreviousPage = page > 1,
+            HasNextPage = page < totalPages
+        };
     }
 
     public async Task<PagedResponse<UserProfileWithLocationsResponse>> SearchPeopleByLocationsAsync(long telegramId, int page = 1, int pageSize = 20)
@@ -209,7 +396,7 @@ public class PeopleService : IPeopleService
 
         var favoriteLocations = await favoriteLocationsQuery.ToListAsync();
 
-        // Group by user and get common locations
+        // Group by user and get common locations, filter by gender compatibility
         var usersWithCommonLocations = favoriteLocations
             .GroupBy(fl => fl.UserId)
             .Select(g => new
@@ -218,6 +405,7 @@ public class PeopleService : IPeopleService
                 CommonLocationIds = g.Select(fl => fl.LocationId).Distinct().ToList(),
                 CommonLocationCount = g.Select(fl => fl.LocationId).Distinct().Count()
             })
+            .Where(x => AreUsersGenderCompatible(currentUser, x.User))
             .OrderByDescending(x => x.CommonLocationCount)
             .ThenBy(x => x.User.Username)
             .ToList();
@@ -344,8 +532,9 @@ public class PeopleService : IPeopleService
             .Where(u => u.Interests != null && !string.IsNullOrEmpty(u.Interests))
             .ToListAsync();
 
-        // Calculate matching interests for each user
+        // Calculate matching interests for each user, filter by gender compatibility
         var usersWithMatchingInterests = allUsers
+            .Where(u => AreUsersGenderCompatible(currentUser, u))
             .Select(u =>
             {
                 var userInterests = DeserializeInterests(u.Interests);
@@ -363,7 +552,7 @@ public class PeopleService : IPeopleService
                     MatchingCount = matchingCategories.Count
                 };
             })
-            .Where(x => x.MatchingCount > 0) // Only users with at least one matching category
+            .Where(x => x.MatchingCount >= 2) // Минимум 2 категории
             .OrderByDescending(x => x.MatchingCount)
             .ThenBy(x => x.User.Username)
             .ToList();
@@ -406,6 +595,150 @@ public class PeopleService : IPeopleService
             // Get matching locations for this user
             var userFavoriteLocations = favoriteLocations
                 .Where(fl => fl.UserId == x.User.Id)
+                .Select(fl => fl.LocationId)
+                .Distinct()
+                .ToList();
+
+            profile.MatchingLocations = userFavoriteLocations
+                .Select(locId =>
+                {
+                    var loc = locations.FirstOrDefault(l => l.Id == locId);
+                    return loc != null
+                        ? new UserProfileWithLocationsResponse.LocationInfo
+                        {
+                            Name = loc.Name
+                        }
+                        : null;
+                })
+                .Where(loc => loc != null)
+                .Cast<UserProfileWithLocationsResponse.LocationInfo>()
+                .ToList();
+
+            return profile;
+        }).ToList();
+
+        return new PagedResponse<UserProfileWithLocationsResponse>
+        {
+            Data = profiles,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount,
+            TotalPages = totalPages,
+            HasPreviousPage = page > 1,
+            HasNextPage = page < totalPages
+        };
+    }
+
+    public async Task<PagedResponse<UserProfileWithLocationsResponse>> SearchAllPeopleAsync(long telegramId, int page = 1, int pageSize = 20)
+    {
+        _logger.LogDebug("SearchAllPeopleAsync: telegramId={TelegramId}, page={Page}, pageSize={PageSize}", 
+            telegramId, page, pageSize);
+
+        // Get current user
+        var currentUser = await _context.Users
+            .FirstOrDefaultAsync(u => u.TelegramId == telegramId && !u.IsDeleted);
+        
+        if (currentUser == null)
+        {
+            _logger.LogWarning("User with TelegramId {TelegramId} not found", telegramId);
+            return new PagedResponse<UserProfileWithLocationsResponse>
+            {
+                Data = new List<UserProfileWithLocationsResponse>(),
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = 0,
+                TotalPages = 0,
+                HasPreviousPage = false,
+                HasNextPage = false
+            };
+        }
+
+        // Get users who current user has liked/disliked
+        var currentUserLikedIds = await _context.UserLikes
+            .Where(ul => ul.UserId == currentUser.Id && !ul.IsDeleted)
+            .Select(ul => ul.TargetUserId)
+            .ToListAsync();
+
+        var currentUserDislikedIds = await _context.UserDislikes
+            .Where(ud => ud.UserId == currentUser.Id && !ud.IsDeleted)
+            .Select(ud => ud.TargetUserId)
+            .ToListAsync();
+
+        // Get users who have liked/disliked current user (exclude them too to avoid showing people who already interacted)
+        var likedUserIds = await _context.UserLikes
+            .Where(ul => ul.TargetUserId == currentUser.Id && !ul.IsDeleted)
+            .Select(ul => ul.UserId)
+            .ToListAsync();
+
+        var dislikedUserIds = await _context.UserDislikes
+            .Where(ud => ud.TargetUserId == currentUser.Id && !ud.IsDeleted)
+            .Select(ud => ud.UserId)
+            .ToListAsync();
+
+        // Combine all excluded user IDs
+        var excludedUserIds = new HashSet<int> { currentUser.Id }
+            .Union(currentUserLikedIds)
+            .Union(currentUserDislikedIds)
+            .Union(likedUserIds)
+            .Union(dislikedUserIds)
+            .ToList();
+
+        // Get all users with filled profiles (simple search like dating apps)
+        // First get all candidates, then filter by gender compatibility in memory
+        var allCandidates = await _context.Users
+            .Where(u => !u.IsDeleted && u.IsActive)
+            .Where(u => u.Id != currentUser.Id)
+            .Where(u => !excludedUserIds.Contains(u.Id))
+            .Where(u => u.ProfileDescription != null && 
+                       !string.IsNullOrEmpty(u.ProfileDescription) &&
+                       u.ProfilePhotos != null && 
+                       !string.IsNullOrEmpty(u.ProfilePhotos))
+            .ToListAsync();
+
+        // Filter by gender compatibility
+        var compatibleUsers = allCandidates
+            .Where(u => AreUsersGenderCompatible(currentUser, u))
+            .ToList();
+
+        var totalCount = compatibleUsers.Count;
+        var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+
+        var users = compatibleUsers
+            .OrderBy(u => u.Username)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        // Get favorite locations for current user and paged users to populate matchingLocations
+        var currentUserFavoriteLocationIds = await _context.FavoriteLocations
+            .Where(fl => fl.UserId == currentUser.Id && !fl.IsDeleted)
+            .Select(fl => fl.LocationId)
+            .ToListAsync();
+
+        var pagedUserIds = users.Select(u => u.Id).ToList();
+        var favoriteLocations = await _context.FavoriteLocations
+            .Where(fl => pagedUserIds.Contains(fl.UserId) && 
+                         currentUserFavoriteLocationIds.Contains(fl.LocationId) && 
+                         !fl.IsDeleted)
+            .Include(fl => fl.Location)
+            .ToListAsync();
+
+        var allLocationIds = favoriteLocations
+            .Select(fl => fl.LocationId)
+            .Distinct()
+            .ToList();
+
+        var locations = await _context.Locations
+            .Where(l => allLocationIds.Contains(l.Id) && !l.IsDeleted)
+            .ToListAsync();
+
+        var profiles = users.Select(u =>
+        {
+            var profile = ToUserProfileWithLocationsResponse(u);
+            
+            // Get matching locations for this user
+            var userFavoriteLocations = favoriteLocations
+                .Where(fl => fl.UserId == u.Id)
                 .Select(fl => fl.LocationId)
                 .Distinct()
                 .ToList();
@@ -776,6 +1109,82 @@ public class PeopleService : IPeopleService
         }
 
         return categories;
+    }
+
+    /// <summary>
+    /// Checks if two users are compatible based on gender preferences (SocialPreference)
+    /// Current user's SocialPreference determines who they're looking for
+    /// Target user's SocialPreference must also match current user's gender (mutual compatibility)
+    /// </summary>
+    private static bool AreUsersGenderCompatible(User currentUser, User targetUser)
+    {
+        // If current user is looking for "alone", they don't want to see anyone
+        if (currentUser.SocialPreference.Equals("alone", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        // If current user is looking for "any", they accept everyone (but still need to check target user's preference)
+        if (currentUser.SocialPreference.Equals("any", StringComparison.OrdinalIgnoreCase))
+        {
+            // Check if target user also accepts current user's gender
+            return DoesUserAcceptGender(targetUser, currentUser.Gender);
+        }
+
+        // Current user is looking for specific gender
+        var lookingForGender = currentUser.SocialPreference.Equals("male", StringComparison.OrdinalIgnoreCase) 
+            ? "Male" 
+            : currentUser.SocialPreference.Equals("female", StringComparison.OrdinalIgnoreCase) 
+                ? "Female" 
+                : null;
+
+        if (lookingForGender == null)
+        {
+            // Unknown preference, allow by default
+            return true;
+        }
+
+        // Check if target user's gender matches what current user is looking for
+        if (!targetUser.Gender.Equals(lookingForGender, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        // Also check if target user accepts current user's gender (mutual compatibility)
+        return DoesUserAcceptGender(targetUser, currentUser.Gender);
+    }
+
+    /// <summary>
+    /// Checks if a user accepts a specific gender based on their SocialPreference
+    /// </summary>
+    private static bool DoesUserAcceptGender(User user, string gender)
+    {
+        // If user is looking for "alone", they don't accept anyone
+        if (user.SocialPreference.Equals("alone", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        // If user is looking for "any", they accept everyone
+        if (user.SocialPreference.Equals("any", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        // Check if user's preference matches the gender
+        var lookingForGender = user.SocialPreference.Equals("male", StringComparison.OrdinalIgnoreCase) 
+            ? "Male" 
+            : user.SocialPreference.Equals("female", StringComparison.OrdinalIgnoreCase) 
+                ? "Female" 
+                : null;
+
+        if (lookingForGender == null)
+        {
+            // Unknown preference, allow by default
+            return true;
+        }
+
+        return gender.Equals(lookingForGender, StringComparison.OrdinalIgnoreCase);
     }
 }
 
