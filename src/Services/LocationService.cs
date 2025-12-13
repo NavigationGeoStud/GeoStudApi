@@ -25,22 +25,19 @@ public class LocationService : ILocationService
     public async Task<IEnumerable<LocationResponse>> GetLocationsAsync(int? categoryId = null, int? subcategoryId = null, string? city = null)
     {
         var query = _context.Locations
-            .Where(l => !l.NeedModerate && !l.IsDeleted) // Exclude locations requiring moderation
+            .Where(l => !l.NeedModerate && !l.IsDeleted)
             .AsQueryable();
 
-        // Filter by category if provided
         if (categoryId.HasValue)
         {
             query = query.Where(l => l.CategoryId == categoryId.Value);
         }
 
-        // Filter by subcategory if provided
         if (subcategoryId.HasValue)
         {
             query = query.Where(l => l.SubcategoryJoins.Any(sj => sj.SubcategoryId == subcategoryId.Value));
         }
 
-        // Filter by city if provided
         if (!string.IsNullOrWhiteSpace(city))
         {
             query = query.Where(l => l.City == city);

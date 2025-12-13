@@ -24,11 +24,9 @@ public class WebhookService : IWebhookService
         _configuration = configuration;
         _logger = logger;
         
-        // Load webhook URL from configuration
         _webhookUrl = _configuration["Webhook:Url"];
         _webhookSecret = _configuration["Webhook:Secret"];
         
-        // Set timeout for webhook requests
         _httpClient.Timeout = TimeSpan.FromSeconds(10);
     }
 
@@ -59,7 +57,6 @@ public class WebhookService : IWebhookService
                 })
             };
 
-            // Add secret token to header if configured
             if (!string.IsNullOrEmpty(_webhookSecret))
             {
                 request.Headers.Add("X-Webhook-Secret", _webhookSecret);
@@ -97,7 +94,6 @@ public class WebhookService : IWebhookService
     {
         try
         {
-            // Validate URL
             if (!Uri.TryCreate(webhookUrl, UriKind.Absolute, out var uri))
             {
                 _logger.LogWarning("Invalid webhook URL: {WebhookUrl}", webhookUrl);

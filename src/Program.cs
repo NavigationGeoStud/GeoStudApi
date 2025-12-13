@@ -92,7 +92,6 @@ if (forceSqlite)
     builder.Environment.EnvironmentName = "Local";
 }
 
-// Детальное логирование всех переменных окружения для диагностики
 Console.WriteLine("🔍 DEBUG: Checking all connection string environment variables:");
 Console.WriteLine($"   ConnectionStrings__DefaultConnection (env): {(string.IsNullOrEmpty(postgresConnectionEnv) ? "NOT SET" : "SET")}");
 if (!string.IsNullOrEmpty(postgresConnectionEnv))

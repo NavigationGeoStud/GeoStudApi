@@ -22,7 +22,6 @@ public class UserService : IUserService
 
     public async Task<UserResponseDto> SubmitUserAsync(string clientId, UserRequest request)
     {
-        // For Telegram users, check by TelegramId if provided, otherwise by Username
         User? existingUser = null;
         
         if (request.TelegramId.HasValue)
@@ -40,18 +39,15 @@ public class UserService : IUserService
         User user;
         if (existingUser != null)
         {
-            // Update existing user
             existingUser.Username = request.Username;
             if (!string.IsNullOrEmpty(request.FirstName))
             {
                 existingUser.FirstName = request.FirstName;
             }
             existingUser.TelegramId = request.TelegramId;
-            // Handle age: prefer Age over AgeRange, but support both for backward compatibility
             if (request.Age.HasValue)
             {
                 existingUser.Age = request.Age.Value;
-                // Optionally clear AgeRange if Age is provided
                 if (string.IsNullOrEmpty(request.AgeRange))
                 {
                     existingUser.AgeRange = null;
@@ -60,13 +56,11 @@ public class UserService : IUserService
             else if (!string.IsNullOrEmpty(request.AgeRange))
             {
                 existingUser.AgeRange = request.AgeRange;
-                // Try to extract age from range if possible (for backward compatibility)
                 existingUser.Age = ExtractAgeFromRange(request.AgeRange);
             }
             existingUser.IsStudent = request.IsStudent;
             existingUser.Gender = request.Gender;
             existingUser.IsLocal = request.IsLocal;
-            // Expand categories to subcategories automatically
             var expandedInterests = InterestCategoryHelper.ExpandCategoriesToSubcategories(request.Interests);
             existingUser.Interests = JsonSerializer.Serialize(expandedInterests);
             existingUser.Budget = request.Budget;
@@ -78,21 +72,18 @@ public class UserService : IUserService
         }
         else
         {
-            // Create new user (for Telegram users, Email and PasswordHash are optional)
             user = new User
             {
                 Username = request.Username,
                 FirstName = request.FirstName,
-                Email = null, // Not required for Telegram users
-                PasswordHash = null, // Not required for Telegram users
+                Email = null,
+                PasswordHash = null,
                 TelegramId = request.TelegramId,
-                // Handle age: prefer Age over AgeRange, but support both for backward compatibility
                 Age = request.Age ?? ExtractAgeFromRange(request.AgeRange),
-                AgeRange = request.AgeRange, // Keep for backward compatibility
+                AgeRange = request.AgeRange,
                 IsStudent = request.IsStudent,
                 Gender = request.Gender,
                 IsLocal = request.IsLocal,
-                // Expand categories to subcategories automatically
                 Interests = JsonSerializer.Serialize(InterestCategoryHelper.ExpandCategoriesToSubcategories(request.Interests)),
                 Budget = request.Budget,
                 ActivityTime = request.ActivityTime,
@@ -105,7 +96,6 @@ public class UserService : IUserService
 
         await _context.SaveChangesAsync();
 
-        // Create individual responses for analytics
         await CreateUserResponses(user.Id, request);
 
         var interests = DeserializeInterests(user.Interests);
