@@ -14,6 +14,7 @@ public class WebhookService : IWebhookService
     private readonly ILogger<WebhookService> _logger;
     private string? _webhookUrl;
     private string? _webhookSecret;
+    private readonly int _webhookTimeoutSeconds;
 
     public WebhookService(
         HttpClient httpClient,
@@ -27,7 +28,11 @@ public class WebhookService : IWebhookService
         _webhookUrl = _configuration["Webhook:Url"];
         _webhookSecret = _configuration["Webhook:Secret"];
         
-        _httpClient.Timeout = TimeSpan.FromSeconds(10);
+        // Настраиваемый таймаут, по умолчанию 30 секунд
+        _webhookTimeoutSeconds = _configuration.GetValue<int>("Webhook:TimeoutSeconds", 30);
+        _httpClient.Timeout = TimeSpan.FromSeconds(_webhookTimeoutSeconds);
+        
+        _logger.LogInformation("WebhookService initialized with timeout: {TimeoutSeconds}s", _webhookTimeoutSeconds);
     }
 
     public async Task<bool> SendNotificationWebhookAsync(long telegramId, NotificationResponse notification)

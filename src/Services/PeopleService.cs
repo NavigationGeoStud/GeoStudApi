@@ -845,101 +845,146 @@ public class PeopleService : IPeopleService
             };
         }
 
-        var reverseLikeExists = await _context.UserLikes
-            .FirstOrDefaultAsync(ul => ul.UserId == targetUser.Id && 
-                                      ul.TargetUserId == currentUser.Id && 
-                                      !ul.IsDeleted);
-
-        var like = new UserLike
+        // Use transaction to prevent race conditions
+        using var transaction = await _context.Database.BeginTransactionAsync();
+        try
         {
-            UserId = currentUser.Id,
-            TargetUserId = targetUser.Id,
-            Message = message
-        };
+            // Re-check reverse like within transaction to prevent race condition
+            var reverseLikeExists = await _context.UserLikes
+                .FirstOrDefaultAsync(ul => ul.UserId == targetUser.Id && 
+                                          ul.TargetUserId == currentUser.Id && 
+                                          !ul.IsDeleted);
 
-        _context.UserLikes.Add(like);
-        await _context.SaveChangesAsync();
-
-        if (reverseLikeExists != null)
-        {
-            var match = new Match
+            var like = new UserLike
             {
-                UserId1 = Math.Min(currentUser.Id, targetUser.Id),
-                UserId2 = Math.Max(currentUser.Id, targetUser.Id)
+                UserId = currentUser.Id,
+                TargetUserId = targetUser.Id,
+                Message = message
             };
 
-            var existingMatch = await _context.Matches
-                .FirstOrDefaultAsync(m => 
-                    ((m.UserId1 == match.UserId1 && m.UserId2 == match.UserId2) ||
-                     (m.UserId1 == match.UserId2 && m.UserId2 == match.UserId1)) &&
-                    !m.IsDeleted);
+            _context.UserLikes.Add(like);
+            await _context.SaveChangesAsync();
 
-            if (existingMatch == null)
+            if (reverseLikeExists != null)
             {
-                _context.Matches.Add(match);
-                await _context.SaveChangesAsync();
-                _logger.LogInformation("Match created between users {UserId1} and {UserId2}", 
-                    currentUser.Id, targetUser.Id);
+                var match = new Match
+                {
+                    UserId1 = Math.Min(currentUser.Id, targetUser.Id),
+                    UserId2 = Math.Max(currentUser.Id, targetUser.Id)
+                };
 
+                // Check for existing match within transaction
+                var existingMatch = await _context.Matches
+                    .FirstOrDefaultAsync(m => 
+                        ((m.UserId1 == match.UserId1 && m.UserId2 == match.UserId2) ||
+                         (m.UserId1 == match.UserId2 && m.UserId2 == match.UserId1)) &&
+                        !m.IsDeleted);
+
+                if (existingMatch == null)
+                {
+                    _context.Matches.Add(match);
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+                    
+                    _logger.LogInformation("Match created between users {UserId1} and {UserId2}", 
+                        currentUser.Id, targetUser.Id);
+
+                    // Create notifications outside transaction to avoid long-running transaction
+                    try
+                    {
+                        await _notificationService.CreateMatchNotificationAsync(
+                            targetTelegramId, 
+                            telegramId);
+                        await _notificationService.CreateMatchNotificationAsync(
+                            telegramId, 
+                            targetTelegramId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to create match notifications");
+                    }
+
+                    var createdMatch = await _context.Matches
+                        .FirstOrDefaultAsync(m => 
+                            ((m.UserId1 == match.UserId1 && m.UserId2 == match.UserId2) ||
+                             (m.UserId1 == match.UserId2 && m.UserId2 == match.UserId1)) &&
+                            !m.IsDeleted);
+
+                    return new LikeResponse
+                    {
+                        Success = true,
+                        IsMatch = true,
+                        Match = createdMatch != null ? new LikeResponse.MatchInfo
+                        {
+                            Id = createdMatch.Id,
+                            CreatedAt = createdMatch.CreatedAt,
+                            User1 = new LikeResponse.UserInfo
+                            {
+                                TelegramId = currentUser.TelegramId ?? 0,
+                                Username = currentUser.Username,
+                                FirstName = currentUser.FirstName
+                            },
+                            User2 = new LikeResponse.UserInfo
+                            {
+                                TelegramId = targetUser.TelegramId ?? 0,
+                                Username = targetUser.Username,
+                                FirstName = targetUser.FirstName
+                            }
+                        } : null
+                    };
+                }
+                else
+                {
+                    await transaction.CommitAsync();
+                    // Match already exists, return existing match info
+                    return new LikeResponse
+                    {
+                        Success = true,
+                        IsMatch = true,
+                        Match = new LikeResponse.MatchInfo
+                        {
+                            Id = existingMatch.Id,
+                            CreatedAt = existingMatch.CreatedAt,
+                            User1 = new LikeResponse.UserInfo
+                            {
+                                TelegramId = currentUser.TelegramId ?? 0,
+                                Username = currentUser.Username,
+                                FirstName = currentUser.FirstName
+                            },
+                            User2 = new LikeResponse.UserInfo
+                            {
+                                TelegramId = targetUser.TelegramId ?? 0,
+                                Username = targetUser.Username,
+                                FirstName = targetUser.FirstName
+                            }
+                        }
+                    };
+                }
+            }
+            else
+            {
+                await transaction.CommitAsync();
+                
+                // Not a mutual like - create like notification (with message if provided)
                 try
                 {
-                    await _notificationService.CreateMatchNotificationAsync(
+                    await _notificationService.CreateLikeNotificationAsync(
                         targetTelegramId, 
-                        telegramId);
-                    await _notificationService.CreateMatchNotificationAsync(
-                        telegramId, 
-                        targetTelegramId);
+                        telegramId,
+                        message);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to create match notifications");
+                    _logger.LogWarning(ex, "Failed to create like notification");
+                    // Don't fail the like operation if notification creation fails
                 }
             }
-
-            var createdMatch = await _context.Matches
-                .FirstOrDefaultAsync(m => 
-                    ((m.UserId1 == match.UserId1 && m.UserId2 == match.UserId2) ||
-                     (m.UserId1 == match.UserId2 && m.UserId2 == match.UserId1)) &&
-                    !m.IsDeleted);
-
-            return new LikeResponse
-            {
-                Success = true,
-                IsMatch = true,
-                Match = createdMatch != null ? new LikeResponse.MatchInfo
-                {
-                    Id = createdMatch.Id,
-                    CreatedAt = createdMatch.CreatedAt,
-                    User1 = new LikeResponse.UserInfo
-                    {
-                        TelegramId = currentUser.TelegramId ?? 0,
-                        Username = currentUser.Username,
-                        FirstName = currentUser.FirstName
-                    },
-                    User2 = new LikeResponse.UserInfo
-                    {
-                        TelegramId = targetUser.TelegramId ?? 0,
-                        Username = targetUser.Username,
-                        FirstName = targetUser.FirstName
-                    }
-                } : null
-            };
         }
-        else
+        catch (Exception ex)
         {
-            // Not a mutual like - create like notification (with message if provided)
-            try
-            {
-                await _notificationService.CreateLikeNotificationAsync(
-                    targetTelegramId, 
-                    telegramId,
-                    message);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to create like notification");
-                // Don't fail the like operation if notification creation fails
-            }
+            await transaction.RollbackAsync();
+            _logger.LogError(ex, "Error in LikeUserAsync transaction");
+            throw;
         }
 
         return new LikeResponse

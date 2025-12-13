@@ -15,6 +15,8 @@ public class Notification : BaseEntity
     [Required]
     public bool IsRead { get; set; } = false;
     
+    public bool WebhookSent { get; set; } = false; // Флаг отправки webhook
+    
     public long? FromTelegramId { get; set; } // Для like и match
     
     public int? LocationId { get; set; } // Для location_suggestion
