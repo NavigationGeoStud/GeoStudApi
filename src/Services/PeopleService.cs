@@ -29,7 +29,6 @@ public class PeopleService : IPeopleService
         _logger.LogDebug("GetCompaniesByLocationAsync: locationId={LocationId}, telegramId={TelegramId}, page={Page}, pageSize={PageSize}", 
             locationId, telegramId, page, pageSize);
 
-        // Validate location exists
         var locationExists = await _context.Locations
             .AnyAsync(l => l.Id == locationId && !l.IsDeleted);
         
@@ -48,7 +47,6 @@ public class PeopleService : IPeopleService
             };
         }
 
-        // Get current user ID
         var currentUser = await _context.Users
             .FirstOrDefaultAsync(u => u.TelegramId == telegramId && !u.IsDeleted);
         
@@ -67,7 +65,6 @@ public class PeopleService : IPeopleService
             };
         }
 
-        // Get all users who have this location in favorites (excluding current user)
         var query = _context.FavoriteLocations
             .Where(fl => fl.LocationId == locationId && !fl.IsDeleted)
             .Where(fl => fl.UserId != currentUser.Id)
@@ -145,7 +142,6 @@ public class PeopleService : IPeopleService
             };
         }
 
-        // Get current user's favorite location IDs (only non-deleted)
         var currentUserFavoriteLocationIds = await _context.FavoriteLocations
             .Where(fl => fl.UserId == currentUser.Id && !fl.IsDeleted)
             .Select(fl => fl.LocationId)
@@ -166,7 +162,6 @@ public class PeopleService : IPeopleService
             };
         }
 
-        // Get users who have liked/disliked current user
         var likedUserIds = await _context.UserLikes
             .Where(ul => ul.TargetUserId == currentUser.Id && !ul.IsDeleted)
             .Select(ul => ul.UserId)
@@ -177,7 +172,6 @@ public class PeopleService : IPeopleService
             .Select(ud => ud.UserId)
             .ToListAsync();
 
-        // Get users who current user has liked/disliked
         var currentUserLikedIds = await _context.UserLikes
             .Where(ul => ul.UserId == currentUser.Id && !ul.IsDeleted)
             .Select(ul => ul.TargetUserId)
@@ -188,15 +182,11 @@ public class PeopleService : IPeopleService
             .Select(ud => ud.TargetUserId)
             .ToListAsync();
 
-        // Get all users with common favorite locations
-        // Exclude: current user, users already liked/disliked by current user
         var excludedUserIds = new HashSet<int> { currentUser.Id }
             .Union(currentUserLikedIds)
             .Union(currentUserDislikedIds)
             .ToList();
 
-        // Get all favorite locations for users with common locations
-        // Filter by users with filled profiles (profileDescription and profilePhotos not empty)
         var favoriteLocationsQuery = _context.FavoriteLocations
             .Where(fl => currentUserFavoriteLocationIds.Contains(fl.LocationId) && !fl.IsDeleted)
             .Where(fl => !excludedUserIds.Contains(fl.UserId))
@@ -230,7 +220,6 @@ public class PeopleService : IPeopleService
             .Take(pageSize)
             .ToList();
 
-        // Get location details for matching locations
         var allLocationIds = pagedUsers
             .SelectMany(u => u.CommonLocationIds)
             .Distinct()
@@ -296,7 +285,6 @@ public class PeopleService : IPeopleService
             };
         }
 
-        // Get current user's interests and extract categories
         var currentUserInterests = DeserializeInterests(currentUser.Interests);
         var currentUserCategories = ExtractInterestCategories(currentUserInterests);
 
@@ -315,7 +303,6 @@ public class PeopleService : IPeopleService
             };
         }
 
-        // Get users who current user has liked/disliked
         var currentUserLikedIds = await _context.UserLikes
             .Where(ul => ul.UserId == currentUser.Id && !ul.IsDeleted)
             .Select(ul => ul.TargetUserId)
@@ -326,13 +313,11 @@ public class PeopleService : IPeopleService
             .Select(ud => ud.TargetUserId)
             .ToListAsync();
 
-        // Get excluded user IDs
         var excludedUserIds = new HashSet<int> { currentUser.Id }
             .Union(currentUserLikedIds)
             .Union(currentUserDislikedIds)
             .ToList();
 
-        // Get all users with filled profiles and interests
         var allUsers = await _context.Users
             .Where(u => !u.IsDeleted && u.IsActive)
             .Where(u => u.Id != currentUser.Id)
@@ -344,14 +329,12 @@ public class PeopleService : IPeopleService
             .Where(u => u.Interests != null && !string.IsNullOrEmpty(u.Interests))
             .ToListAsync();
 
-        // Calculate matching interests for each user
         var usersWithMatchingInterests = allUsers
             .Select(u =>
             {
                 var userInterests = DeserializeInterests(u.Interests);
                 var userCategories = ExtractInterestCategories(userInterests);
                 
-                // Count matching categories
                 var matchingCategories = currentUserCategories
                     .Intersect(userCategories)
                     .ToList();
@@ -376,7 +359,6 @@ public class PeopleService : IPeopleService
             .Take(pageSize)
             .ToList();
 
-        // Get favorite locations for paged users to populate matchingLocations
         var pagedUserIds = pagedUsers.Select(u => u.User.Id).ToList();
         var currentUserFavoriteLocationIds = await _context.FavoriteLocations
             .Where(fl => fl.UserId == currentUser.Id && !fl.IsDeleted)
@@ -445,13 +427,11 @@ public class PeopleService : IPeopleService
         _logger.LogDebug("LikeUserAsync: telegramId={TelegramId}, targetTelegramId={TargetTelegramId}, message={Message}", 
             telegramId, targetTelegramId, message);
 
-        // Validate users
         if (telegramId == targetTelegramId)
         {
             throw new ArgumentException("Cannot like yourself", nameof(targetTelegramId));
         }
 
-        // Validate message length
         if (!string.IsNullOrEmpty(message) && message.Length > 500)
         {
             throw new ArgumentException("Message cannot exceed 500 characters", nameof(message));
@@ -482,7 +462,6 @@ public class PeopleService : IPeopleService
         if (existingLike != null)
         {
             _logger.LogDebug("User {UserId} already liked user {TargetUserId}", currentUser.Id, targetUser.Id);
-            // Check if it's a match
             var reverseLike = await _context.UserLikes
                 .FirstOrDefaultAsync(ul => ul.UserId == targetUser.Id && 
                                           ul.TargetUserId == currentUser.Id && 
@@ -490,7 +469,6 @@ public class PeopleService : IPeopleService
             
             if (reverseLike != null)
             {
-                // It's a match, get match info
                 var match = await _context.Matches
                     .FirstOrDefaultAsync(m => 
                         ((m.UserId1 == Math.Min(currentUser.Id, targetUser.Id) && 
@@ -533,14 +511,11 @@ public class PeopleService : IPeopleService
             };
         }
 
-        // Check if it's a mutual like BEFORE creating the like
-        // This is the key: if target user already liked current user, it's a match, not a like notification
         var reverseLikeExists = await _context.UserLikes
             .FirstOrDefaultAsync(ul => ul.UserId == targetUser.Id && 
                                       ul.TargetUserId == currentUser.Id && 
                                       !ul.IsDeleted);
 
-        // Create like
         var like = new UserLike
         {
             UserId = currentUser.Id,
@@ -553,14 +528,12 @@ public class PeopleService : IPeopleService
 
         if (reverseLikeExists != null)
         {
-            // It's a mutual like - create match and match notifications, NOT like notification
             var match = new Match
             {
                 UserId1 = Math.Min(currentUser.Id, targetUser.Id),
                 UserId2 = Math.Max(currentUser.Id, targetUser.Id)
             };
 
-            // Check if match already exists
             var existingMatch = await _context.Matches
                 .FirstOrDefaultAsync(m => 
                     ((m.UserId1 == match.UserId1 && m.UserId2 == match.UserId2) ||
@@ -574,7 +547,6 @@ public class PeopleService : IPeopleService
                 _logger.LogInformation("Match created between users {UserId1} and {UserId2}", 
                     currentUser.Id, targetUser.Id);
 
-                // Create match notifications for both users (NOT like notification)
                 try
                 {
                     await _notificationService.CreateMatchNotificationAsync(
@@ -587,11 +559,9 @@ public class PeopleService : IPeopleService
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Failed to create match notifications");
-                    // Don't fail the match operation if notification creation fails
                 }
             }
 
-            // Get the match for response
             var createdMatch = await _context.Matches
                 .FirstOrDefaultAsync(m => 
                     ((m.UserId1 == match.UserId1 && m.UserId2 == match.UserId2) ||
@@ -672,7 +642,6 @@ public class PeopleService : IPeopleService
             throw new ArgumentException("Target user not found", nameof(targetTelegramId));
         }
 
-        // Check if already disliked
         var existingDislike = await _context.UserDislikes
             .FirstOrDefaultAsync(ud => ud.UserId == currentUser.Id && 
                                        ud.TargetUserId == targetUser.Id && 
@@ -684,7 +653,6 @@ public class PeopleService : IPeopleService
             return true;
         }
 
-        // Create dislike
         var dislike = new UserDislike
         {
             UserId = currentUser.Id,

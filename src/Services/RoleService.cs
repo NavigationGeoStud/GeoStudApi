@@ -29,7 +29,6 @@ public class RoleService : IRoleService
     {
         var cacheKey = $"{RoleCachePrefix}username_{username}";
         
-        // Try to get from cache first
         if (_cache.TryGetValue(cacheKey, out RoleCheckResponse? cachedResponse))
         {
             _logger.LogDebug("Role cache hit for Username: {Username}", username);
@@ -38,7 +37,6 @@ public class RoleService : IRoleService
 
         _logger.LogDebug("Role cache miss for Username: {Username}, querying database", username);
 
-        // Get from database
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.Username == username && !u.IsDeleted);
 
@@ -57,7 +55,6 @@ public class RoleService : IRoleService
             IsUser = user.Role == UserRole.User
         };
 
-        // Cache the result with size specification
         var cacheOptions = new MemoryCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = CacheExpiration,
@@ -73,7 +70,6 @@ public class RoleService : IRoleService
     {
         var cacheKey = $"{RoleCachePrefix}telegram_{telegramId}";
         
-        // Try to get from cache first
         if (_cache.TryGetValue(cacheKey, out RoleCheckResponse? cachedResponse))
         {
             _logger.LogDebug("Role cache hit for TelegramId: {TelegramId}", telegramId);
@@ -82,7 +78,6 @@ public class RoleService : IRoleService
 
         _logger.LogDebug("Role cache miss for TelegramId: {TelegramId}, querying database", telegramId);
 
-        // Get from database
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.TelegramId == telegramId && !u.IsDeleted);
 
@@ -101,7 +96,6 @@ public class RoleService : IRoleService
             IsUser = user.Role == UserRole.User
         };
 
-        // Cache the result with size specification
         var cacheOptions = new MemoryCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = CacheExpiration,
@@ -125,14 +119,12 @@ public class RoleService : IRoleService
             return false;
         }
 
-        // Validate role (only Manager and Admin can be assigned)
         if (request.Role != UserRole.Manager && request.Role != UserRole.Admin)
         {
             _logger.LogWarning("Invalid role assignment attempt. Role: {Role} is not allowed for assignment", request.Role);
             return false;
         }
 
-        // Get target user by Username
         var targetUser = await _context.Users
             .FirstOrDefaultAsync(u => u.Username == request.Username && !u.IsDeleted);
 
@@ -142,13 +134,11 @@ public class RoleService : IRoleService
             return false;
         }
 
-        // Update role
         targetUser.Role = request.Role;
         targetUser.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
 
-        // Invalidate cache for the target user
         InvalidateRoleCache(targetUser.Username);
         if (targetUser.TelegramId.HasValue)
         {
