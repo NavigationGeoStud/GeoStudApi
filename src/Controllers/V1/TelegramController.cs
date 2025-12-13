@@ -749,13 +749,14 @@ public class TelegramController : ControllerBase
     }
 
     /// <summary>
-    /// Search people with common favorite locations or similar interests
+    /// Search people - by default combines search: first shows people with common locations, then people with 2+ matching interest categories.
+    /// Can also search only by locations, only by interests, or all people. All searches respect gender preferences (SocialPreference).
     /// </summary>
     /// <param name="telegramId">Telegram user ID</param>
-    /// <param name="searchBy">Type of search: "locations" (by common favorite locations) or "interests" (by similar interests)</param>
+    /// <param name="searchBy">Type of search: null or empty (default - combined: locations first, then interests with 2+ categories), "locations" (only common locations), "interests" (only interests with 2+ categories), or "all" (all people with filled profiles)</param>
     /// <param name="page">Page number (default: 1)</param>
     /// <param name="pageSize">Page size (default: 20)</param>
-    /// <returns>Paginated list of users with common favorite locations or similar interests</returns>
+    /// <returns>Paginated list of users</returns>
     [HttpGet("people/search")]
     [ProducesResponseType(typeof(PagedResponse<UserProfileWithLocationsResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -775,9 +776,9 @@ public class TelegramController : ControllerBase
             if (pageSize > 100) pageSize = 100;
 
             // Validate searchBy parameter
-            if (!string.IsNullOrEmpty(searchBy) && searchBy != "locations" && searchBy != "interests")
+            if (!string.IsNullOrEmpty(searchBy) && searchBy != "locations" && searchBy != "interests" && searchBy != "all")
             {
-                return BadRequest(new { error = "searchBy parameter must be either 'locations' or 'interests'" });
+                return BadRequest(new { error = "searchBy parameter must be either empty/null (default - combined search), 'locations', 'interests', or 'all'" });
             }
 
             var response = await _peopleService.SearchPeopleAsync(telegramId, searchBy, page, pageSize);
