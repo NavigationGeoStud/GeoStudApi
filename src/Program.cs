@@ -402,13 +402,89 @@ using (var scope = app.Services.CreateScope())
     
     try
     {
-        // Apply migrations
-        // Suppress the pending model changes warning if migrations are already applied
-        var pendingMigrations = context.Database.GetPendingMigrations().ToList();
-        if (pendingMigrations.Any())
+        // First, ensure the migrations history table exists
+        var connection = context.Database.GetDbConnection();
+        if (connection.State != System.Data.ConnectionState.Open)
         {
+            await connection.OpenAsync();
+        }
+        
+        // Check if __EFMigrationsHistory table exists
+        using var checkCommand = connection.CreateCommand();
+        checkCommand.CommandText = @"
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name = '__EFMigrationsHistory'
+            );";
+        var historyTableExists = (bool)(await checkCommand.ExecuteScalarAsync())!;
+        
+        if (!historyTableExists)
+        {
+            Console.WriteLine("📋 Creating migrations history table...");
+            using var createCommand = connection.CreateCommand();
+            createCommand.CommandText = @"
+                CREATE TABLE IF NOT EXISTS ""__EFMigrationsHistory"" (
+                    ""MigrationId"" character varying(150) NOT NULL,
+                    ""ProductVersion"" character varying(32) NOT NULL,
+                    CONSTRAINT ""PK___EFMigrationsHistory"" PRIMARY KEY (""MigrationId"")
+                );";
+            await createCommand.ExecuteNonQueryAsync();
+            Console.WriteLine("✅ Migrations history table created");
+        }
+        
+        // Now try to get applied migrations
+        List<string> appliedMigrations;
+        try
+        {
+            appliedMigrations = context.Database.GetAppliedMigrations().ToList();
+        }
+        catch
+        {
+            // If GetAppliedMigrations fails, assume no migrations are applied
+            appliedMigrations = new List<string>();
+        }
+        
+        var allMigrations = context.Database.GetMigrations().ToList();
+        var pendingMigrations = allMigrations.Except(appliedMigrations).ToList();
+        
+        // Check if any tables exist (indicating database was created before)
+        using var tablesCheckCommand = connection.CreateCommand();
+        tablesCheckCommand.CommandText = @"
+            SELECT COUNT(*) 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            AND table_name NOT IN ('__EFMigrationsHistory');";
+        var tablesCount = Convert.ToInt32(await tablesCheckCommand.ExecuteScalarAsync());
+        
+        if (tablesCount > 0 && pendingMigrations.Any())
+        {
+            // Tables exist but migrations are not marked as applied
+            Console.WriteLine($"⚠️ Database tables already exist ({tablesCount} tables found) but migration history is incomplete.");
+            Console.WriteLine("📝 Marking existing migrations as applied...");
+            
+            foreach (var migration in pendingMigrations)
+            {
+                using var insertCommand = connection.CreateCommand();
+                insertCommand.CommandText = $@"
+                    INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"")
+                    SELECT '{migration}', '9.0.0'
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM ""__EFMigrationsHistory"" 
+                        WHERE ""MigrationId"" = '{migration}'
+                    );";
+                await insertCommand.ExecuteNonQueryAsync();
+                Console.WriteLine($"  ✓ Marked migration '{migration}' as applied");
+            }
+            
+            Console.WriteLine("✅ Migration history synchronized");
+        }
+        else if (pendingMigrations.Any())
+        {
+            // No tables exist, apply migrations normally
             Console.WriteLine($"📦 Applying {pendingMigrations.Count} pending migration(s)...");
             context.Database.Migrate();
+            Console.WriteLine("✅ Migrations applied successfully");
         }
         else
         {
@@ -417,60 +493,19 @@ using (var scope = app.Services.CreateScope())
     }
     catch (PostgresException pgEx) when (pgEx.SqlState == "42P07") // relation already exists
     {
-        // Tables exist but migration history is missing - mark migrations as applied
-        Console.WriteLine($"⚠️ Tables already exist but migration history is incomplete. Marking migrations as applied...");
-        try
-        {
-            var appliedMigrations = context.Database.GetAppliedMigrations().ToList();
-            var allMigrations = context.Database.GetMigrations().ToList();
-            
-            var connection = context.Database.GetDbConnection();
-            if (connection.State != System.Data.ConnectionState.Open)
-            {
-                await connection.OpenAsync();
-            }
-            
-            foreach (var migration in allMigrations)
-            {
-                if (!appliedMigrations.Contains(migration))
-                {
-                    using var command = connection.CreateCommand();
-                    command.CommandText = $@"
-                        INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"")
-                        SELECT '{migration}', '9.0.0'
-                        WHERE NOT EXISTS (
-                            SELECT 1 FROM ""__EFMigrationsHistory"" 
-                            WHERE ""MigrationId"" = '{migration}'
-                        );";
-                    await command.ExecuteNonQueryAsync();
-                    Console.WriteLine($"  ✓ Marked migration '{migration}' as applied");
-                }
-            }
-            
-            Console.WriteLine("✅ Migration history synchronized");
-        }
-        catch (Exception syncEx)
-        {
-            Console.WriteLine($"❌ Failed to sync migration history: {syncEx.Message}");
-            Console.WriteLine("💡 You may need to manually run the MarkMigrationsAsApplied.sql script");
-            throw;
-        }
+        // This should not happen with the new logic, but keep as fallback
+        Console.WriteLine($"⚠️ Table already exists error: {pgEx.Message}");
+        Console.WriteLine("💡 This might indicate a schema mismatch. Please check your database.");
     }
     catch (Exception ex)
     {
-        // If migration fails, try to ensure database exists
-        Console.WriteLine($"⚠️ Migration warning: {ex.Message}");
-        try
+        Console.WriteLine($"❌ Migration error: {ex.Message}");
+        Console.WriteLine($"   Error type: {ex.GetType().Name}");
+        if (ex.InnerException != null)
         {
-            // Ensure database is created even if migrations fail
-            await context.Database.EnsureCreatedAsync();
-            Console.WriteLine("📊 Database ensured (migrations may need manual application)");
+            Console.WriteLine($"   Inner error: {ex.InnerException.Message}");
         }
-        catch (Exception ensureEx)
-        {
-            Console.WriteLine($"❌ Failed to ensure database: {ensureEx.Message}");
-            throw;
-        }
+        throw;
     }
     
     // Seed initial data
@@ -490,3 +525,4 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
+
