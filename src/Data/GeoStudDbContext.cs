@@ -96,6 +96,7 @@ public class GeoStudDbContext : DbContext
             entity.HasIndex(e => e.IsActive);
             entity.HasIndex(e => e.IsVerified);
             entity.HasIndex(e => e.CategoryId);
+            entity.HasIndex(e => e.CreatedByTelegramId);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql(defaultDateSql);
         });
 

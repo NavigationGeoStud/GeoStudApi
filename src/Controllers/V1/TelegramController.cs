@@ -654,7 +654,7 @@ public class TelegramController : ControllerBase
     }
 
     /// <summary>
-    /// Create location (only Admin or Manager can create locations)
+    /// Create location (all users can create locations, but with 1 hour timeout between creations)
     /// </summary>
     /// <param name="request">Location creation request</param>
     /// <param name="telegramId">Telegram ID of the user making the request</param>
@@ -678,21 +678,31 @@ public class TelegramController : ControllerBase
                 return BadRequest(new { error = "telegramId query parameter is required and must be a valid Telegram user ID" });
             }
 
-            // Check user role - only Admin (2) or Manager (1) can create locations
+            // Check if user exists
             var roleResponse = await _roleService.GetUserRoleAsync(telegramId);
             if (roleResponse == null)
             {
                 return NotFound(new { error = "User not found" });
             }
 
-            if (!roleResponse.IsAdmin && !roleResponse.IsManager)
+            // For regular users, check timeout. Admins and Managers can create without timeout
+            if (roleResponse.IsUser)
             {
-                _logger.LogWarning("Unauthorized location creation attempt. TelegramId: {TelegramId} does not have required role", telegramId);
-                return StatusCode(403, new { error = "Only administrators and managers can create locations" });
+                var canCreate = await _locationService.CanUserCreateLocationAsync(telegramId);
+                if (!canCreate)
+                {
+                    // The timeout check is already done in CreateLocationFromTelegramAsync
+                    // This is just a pre-check, the actual check will throw InvalidOperationException
+                }
             }
 
-            var location = await _locationService.CreateLocationFromTelegramAsync(request);
+            var location = await _locationService.CreateLocationFromTelegramAsync(request, telegramId);
             return CreatedAtAction(nameof(GetAllLocations), new { telegramId }, location);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Location creation timeout");
+            return StatusCode(429, new { error = ex.Message });
         }
         catch (ArgumentException ex)
         {
@@ -1533,6 +1543,70 @@ public class TelegramController : ControllerBase
         {
             _logger.LogError(ex, "Error moderating all locations with AI");
             return StatusCode(500, new { error = "Internal server error", message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Update user's own location (only while under moderation)
+    /// </summary>
+    /// <param name="locationId">Location ID</param>
+    /// <param name="request">Location update request</param>
+    /// <param name="telegramId">Telegram ID of the user making the request</param>
+    /// <returns>Updated location response</returns>
+    [HttpPut("locations/{locationId}/my-location")]
+    [ProducesResponseType(typeof(LocationResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateMyLocation(int locationId, [FromBody] UpdateLocationModerationRequest request, [FromQuery] long telegramId)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            if (telegramId == 0)
+            {
+                return BadRequest(new { error = "telegramId query parameter is required and must be a valid Telegram user ID" });
+            }
+
+            // Check if user exists
+            var roleResponse = await _roleService.GetUserRoleAsync(telegramId);
+            if (roleResponse == null)
+            {
+                return NotFound(new { error = "User not found" });
+            }
+
+            var location = await _locationService.UpdateUserLocationAsync(locationId, telegramId, request);
+            if (location == null)
+            {
+                return NotFound(new { error = "Location not found" });
+            }
+
+            return Ok(location);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning(ex, "Unauthorized location update attempt. TelegramId: {TelegramId}, LocationId: {LocationId}", telegramId, locationId);
+            return StatusCode(403, new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Invalid location update attempt. TelegramId: {TelegramId}, LocationId: {LocationId}", telegramId, locationId);
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "Invalid location update request");
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating user location");
+            return StatusCode(500, "Internal server error");
         }
     }
 }
