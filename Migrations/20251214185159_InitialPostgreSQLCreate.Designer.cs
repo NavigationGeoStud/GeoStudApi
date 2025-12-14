@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GeoStud.Api.Migrations
 {
     [DbContext(typeof(GeoStudDbContext))]
-    [Migration("20251114111106_InitialPostgreSQLCreate")]
+    [Migration("20251214185159_InitialPostgreSQLCreate")]
     partial class InitialPostgreSQLCreate
     {
         /// <inheritdoc />
@@ -149,6 +149,9 @@ namespace GeoStud.Api.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<long?>("CreatedByTelegramId")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("Description")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
@@ -166,6 +169,9 @@ namespace GeoStud.Api.Migrations
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
+
+                    b.Property<bool>("NeedModerate")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Phone")
                         .HasMaxLength(20)
@@ -203,6 +209,8 @@ namespace GeoStud.Api.Migrations
                     b.HasIndex("City");
 
                     b.HasIndex("Coordinates");
+
+                    b.HasIndex("CreatedByTelegramId");
 
                     b.HasIndex("IsActive");
 
@@ -462,6 +470,9 @@ namespace GeoStud.Api.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("WebhookSent")
+                        .HasColumnType("boolean");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedAt");
@@ -546,8 +557,10 @@ namespace GeoStud.Api.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<int?>("Age")
+                        .HasColumnType("integer");
+
                     b.Property<string>("AgeRange")
-                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
