@@ -83,13 +83,35 @@ public class NotificationService : INotificationService
         _logger.LogDebug("CreateLikeNotificationAsync: toTelegramId={ToTelegramId}, fromTelegramId={FromTelegramId}, message={Message}", 
             toTelegramId, fromTelegramId, message);
 
+        // Check if notification already exists (unread) for this like
+        var existingNotification = await _context.Notifications
+            .FirstOrDefaultAsync(n => n.TelegramId == toTelegramId && 
+                                     n.FromTelegramId == fromTelegramId && 
+                                     n.Type == "like" && 
+                                     !n.IsDeleted && 
+                                     !n.IsRead);
+
+        if (existingNotification != null)
+        {
+            _logger.LogDebug("Like notification already exists: Id={NotificationId}", existingNotification.Id);
+            // Update message if provided and different
+            if (!string.IsNullOrEmpty(message) && existingNotification.Message != message)
+            {
+                existingNotification.Message = message;
+                existingNotification.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+            }
+            return await GetNotificationResponseAsync(existingNotification);
+        }
+
         var notification = new Notification
         {
             TelegramId = toTelegramId,
             Type = "like",
             FromTelegramId = fromTelegramId,
             Message = message,
-            IsRead = false
+            IsRead = false,
+            WebhookSent = false
         };
 
         _context.Notifications.Add(notification);
@@ -107,7 +129,13 @@ public class NotificationService : INotificationService
             {
                 try
                 {
-                    await _webhookService.SendNotificationWebhookAsync(toTelegramId, notificationResponse);
+                    var webhookSent = await _webhookService.SendNotificationWebhookAsync(toTelegramId, notificationResponse);
+                    if (webhookSent)
+                    {
+                        notification.WebhookSent = true;
+                        notification.UpdatedAt = DateTime.UtcNow;
+                        await _context.SaveChangesAsync();
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -124,12 +152,27 @@ public class NotificationService : INotificationService
         _logger.LogDebug("CreateMatchNotificationAsync: toTelegramId={ToTelegramId}, fromTelegramId={FromTelegramId}", 
             toTelegramId, fromTelegramId);
 
+        // Check if notification already exists (unread) for this match
+        var existingNotification = await _context.Notifications
+            .FirstOrDefaultAsync(n => n.TelegramId == toTelegramId && 
+                                     n.FromTelegramId == fromTelegramId && 
+                                     n.Type == "match" && 
+                                     !n.IsDeleted && 
+                                     !n.IsRead);
+
+        if (existingNotification != null)
+        {
+            _logger.LogDebug("Match notification already exists: Id={NotificationId}", existingNotification.Id);
+            return await GetNotificationResponseAsync(existingNotification);
+        }
+
         var notification = new Notification
         {
             TelegramId = toTelegramId,
             Type = "match",
             FromTelegramId = fromTelegramId,
-            IsRead = false
+            IsRead = false,
+            WebhookSent = false
         };
 
         _context.Notifications.Add(notification);
@@ -147,7 +190,13 @@ public class NotificationService : INotificationService
             {
                 try
                 {
-                    await _webhookService.SendNotificationWebhookAsync(toTelegramId, notificationResponse);
+                    var webhookSent = await _webhookService.SendNotificationWebhookAsync(toTelegramId, notificationResponse);
+                    if (webhookSent)
+                    {
+                        notification.WebhookSent = true;
+                        notification.UpdatedAt = DateTime.UtcNow;
+                        await _context.SaveChangesAsync();
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -183,7 +232,8 @@ public class NotificationService : INotificationService
             TelegramId = telegramId,
             Type = "location_suggestion",
             LocationId = locationId,
-            IsRead = false
+            IsRead = false,
+            WebhookSent = false
         };
 
         _context.Notifications.Add(notification);
@@ -201,7 +251,13 @@ public class NotificationService : INotificationService
             {
                 try
                 {
-                    await _webhookService.SendNotificationWebhookAsync(telegramId, notificationResponse);
+                    var webhookSent = await _webhookService.SendNotificationWebhookAsync(telegramId, notificationResponse);
+                    if (webhookSent)
+                    {
+                        notification.WebhookSent = true;
+                        notification.UpdatedAt = DateTime.UtcNow;
+                        await _context.SaveChangesAsync();
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -247,6 +303,12 @@ public class NotificationService : INotificationService
                     ProfilePhotos = profilePhotos
                 };
             }
+            else
+            {
+                // User was deleted - log warning but still return notification
+                _logger.LogWarning("User with TelegramId {TelegramId} not found for notification {NotificationId}", 
+                    notification.FromTelegramId.Value, notification.Id);
+            }
         }
 
         // Load location for location_suggestion notifications
@@ -266,6 +328,12 @@ public class NotificationService : INotificationService
                     City = location.City,
                     CategoryId = location.CategoryId
                 };
+            }
+            else
+            {
+                // Location was deleted - log warning
+                _logger.LogWarning("Location with Id {LocationId} not found for notification {NotificationId}", 
+                    notification.LocationId.Value, notification.Id);
             }
         }
 

@@ -146,6 +146,9 @@ namespace GeoStud.Api.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<long?>("CreatedByTelegramId")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("Description")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
@@ -203,6 +206,8 @@ namespace GeoStud.Api.Migrations
                     b.HasIndex("City");
 
                     b.HasIndex("Coordinates");
+
+                    b.HasIndex("CreatedByTelegramId");
 
                     b.HasIndex("IsActive");
 
@@ -461,6 +466,9 @@ namespace GeoStud.Api.Migrations
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("WebhookSent")
+                        .HasColumnType("boolean");
 
                     b.HasKey("Id");
 

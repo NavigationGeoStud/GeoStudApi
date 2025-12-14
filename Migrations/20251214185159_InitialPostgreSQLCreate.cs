@@ -88,7 +88,8 @@ namespace GeoStud.Api.Migrations
                     FirstName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     LastName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     TelegramId = table.Column<long>(type: "bigint", nullable: true),
-                    AgeRange = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    AgeRange = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
+                    Age = table.Column<int>(type: "integer", nullable: true),
                     IsStudent = table.Column<bool>(type: "boolean", nullable: false),
                     Gender = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
                     IsLocal = table.Column<bool>(type: "boolean", nullable: false),
@@ -130,7 +131,9 @@ namespace GeoStud.Api.Migrations
                     WorkingHours = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
                     IsVerified = table.Column<bool>(type: "boolean", nullable: false),
+                    NeedModerate = table.Column<bool>(type: "boolean", nullable: false),
                     CategoryId = table.Column<int>(type: "integer", nullable: false),
+                    CreatedByTelegramId = table.Column<long>(type: "bigint", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false)
@@ -349,6 +352,7 @@ namespace GeoStud.Api.Migrations
                     TelegramId = table.Column<long>(type: "bigint", nullable: false),
                     Type = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     IsRead = table.Column<bool>(type: "boolean", nullable: false),
+                    WebhookSent = table.Column<bool>(type: "boolean", nullable: false),
                     FromTelegramId = table.Column<long>(type: "bigint", nullable: true),
                     LocationId = table.Column<int>(type: "integer", nullable: true),
                     Message = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
@@ -446,6 +450,11 @@ namespace GeoStud.Api.Migrations
                 name: "IX_Locations_Coordinates",
                 table: "Locations",
                 column: "Coordinates");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Locations_CreatedByTelegramId",
+                table: "Locations",
+                column: "CreatedByTelegramId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Locations_IsActive",

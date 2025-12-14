@@ -409,8 +409,40 @@ public class LocationService : ILocationService
         return degrees * Math.PI / 180.0;
     }
 
-    public async Task<LocationResponse> CreateLocationFromTelegramAsync(CreateLocationTelegramRequest request)
+    public async Task<bool> CanUserCreateLocationAsync(long telegramId)
     {
+        // Check if user has created a location in the last hour
+        var oneHourAgo = DateTime.UtcNow.AddHours(-1);
+        var recentLocation = await _context.Locations
+            .Where(l => l.CreatedByTelegramId == telegramId && !l.IsDeleted && l.CreatedAt >= oneHourAgo)
+            .OrderByDescending(l => l.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        return recentLocation == null;
+    }
+
+    public async Task<LocationResponse> CreateLocationFromTelegramAsync(CreateLocationTelegramRequest request, long? telegramId = null)
+    {
+        // Check timeout if telegramId is provided (for regular users)
+        if (telegramId.HasValue)
+        {
+            var canCreate = await CanUserCreateLocationAsync(telegramId.Value);
+            if (!canCreate)
+            {
+                var lastLocation = await _context.Locations
+                    .Where(l => l.CreatedByTelegramId == telegramId.Value && !l.IsDeleted)
+                    .OrderByDescending(l => l.CreatedAt)
+                    .FirstOrDefaultAsync();
+
+                if (lastLocation != null)
+                {
+                    var timeSinceLastCreation = DateTime.UtcNow - lastLocation.CreatedAt;
+                    var remainingTime = TimeSpan.FromHours(1) - timeSinceLastCreation;
+                    throw new InvalidOperationException($"Вы можете создать следующую локацию через {remainingTime.Minutes} минут и {remainingTime.Seconds} секунд");
+                }
+            }
+        }
+
         // Convert to LocationRequest format for validation
         var locationRequest = new LocationRequest
         {
@@ -474,7 +506,8 @@ public class LocationService : ILocationService
             IsActive = true,
             IsVerified = false,
             NeedModerate = true, // Locations created via Telegram require moderation
-            CategoryId = request.CategoryId
+            CategoryId = request.CategoryId,
+            CreatedByTelegramId = telegramId
         };
 
         _context.Locations.Add(location);
@@ -822,6 +855,160 @@ public class LocationService : ILocationService
             response.TotalLocations, response.SuccessfullyModerated, response.Failed);
 
         return response;
+    }
+
+    public async Task<LocationResponse?> UpdateUserLocationAsync(int locationId, long telegramId, UpdateLocationModerationRequest request)
+    {
+        var location = await _context.Locations
+            .Include(l => l.Category)
+            .Include(l => l.SubcategoryJoins)
+                .ThenInclude(sj => sj.Subcategory)
+            .FirstOrDefaultAsync(l => l.Id == locationId && !l.IsDeleted);
+
+        if (location == null)
+        {
+            return null;
+        }
+
+        // Check if location belongs to the user
+        if (location.CreatedByTelegramId != telegramId)
+        {
+            throw new UnauthorizedAccessException("Вы можете редактировать только свои локации");
+        }
+
+        // Check if location is still under moderation
+        if (!location.NeedModerate)
+        {
+            throw new InvalidOperationException("Вы можете редактировать локацию только пока она на модерации");
+        }
+
+        // Update only provided fields
+        if (request.Name != null)
+        {
+            location.Name = request.Name;
+        }
+
+        if (request.Description != null)
+        {
+            location.Description = request.Description;
+        }
+
+        if (request.Address != null)
+        {
+            location.Address = request.Address;
+        }
+
+        if (request.City != null)
+        {
+            location.City = request.City;
+        }
+
+        if (request.Phone != null)
+        {
+            location.Phone = request.Phone;
+        }
+
+        if (request.Website != null)
+        {
+            location.Website = request.Website;
+        }
+
+        if (request.TelegramImageIds != null)
+        {
+            location.TelegramImageIds = request.TelegramImageIds;
+        }
+
+        if (request.Rating.HasValue)
+        {
+            location.Rating = request.Rating.Value;
+        }
+
+        if (request.PriceRange != null)
+        {
+            location.PriceRange = request.PriceRange;
+        }
+
+        if (request.WorkingHours != null)
+        {
+            location.WorkingHours = request.WorkingHours;
+        }
+
+        // Update category if provided
+        if (request.CategoryId.HasValue)
+        {
+            var category = await _context.LocationCategories
+                .FirstOrDefaultAsync(c => c.Id == request.CategoryId.Value && c.IsActive && !c.IsDeleted);
+
+            if (category == null)
+            {
+                throw new ArgumentException("Category not found or inactive", nameof(request));
+            }
+
+            location.CategoryId = request.CategoryId.Value;
+        }
+
+        // Update subcategories if provided
+        if (request.SubcategoryIds != null)
+        {
+            // Validate subcategories belong to the category
+            var categoryId = request.CategoryId ?? location.CategoryId;
+            var invalidSubcategories = await _context.LocationSubcategories
+                .Where(s => request.SubcategoryIds.Contains(s.Id) && (s.CategoryId != categoryId || !s.IsActive))
+                .ToListAsync();
+
+            if (invalidSubcategories.Any())
+            {
+                throw new ArgumentException("Some subcategories do not belong to the selected category or are inactive", nameof(request));
+            }
+
+            // Remove old subcategory associations
+            var existingSubcategoryIds = location.SubcategoryJoins.Select(sj => sj.SubcategoryId).ToList();
+            var newSubcategoryIds = request.SubcategoryIds.ToList();
+
+            var subcategoriesToRemove = location.SubcategoryJoins
+                .Where(sj => !newSubcategoryIds.Contains(sj.SubcategoryId))
+                .ToList();
+            foreach (var join in subcategoriesToRemove)
+            {
+                _context.LocationSubcategoryJoins.Remove(join);
+            }
+
+            // Add new subcategory associations
+            var subcategoriesToAdd = newSubcategoryIds
+                .Where(sid => !existingSubcategoryIds.Contains(sid))
+                .ToList();
+
+            if (subcategoriesToAdd.Any())
+            {
+                var validSubcategories = await _context.LocationSubcategories
+                    .Where(s => subcategoriesToAdd.Contains(s.Id) && s.IsActive)
+                    .ToListAsync();
+
+                var newSubcategoryJoins = validSubcategories.Select(s => new LocationSubcategoryJoin
+                {
+                    LocationId = location.Id,
+                    SubcategoryId = s.Id
+                }).ToList();
+
+                _context.LocationSubcategoryJoins.AddRange(newSubcategoryJoins);
+            }
+        }
+
+        location.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        // Reload with category and subcategories
+        await _context.Entry(location)
+            .Reference(l => l.Category)
+            .LoadAsync();
+            
+        await _context.Entry(location)
+            .Collection(l => l.SubcategoryJoins)
+            .Query()
+            .Include(sj => sj.Subcategory)
+            .LoadAsync();
+
+        return ToLocationResponse(location);
     }
 }
 

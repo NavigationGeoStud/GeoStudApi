@@ -50,6 +50,8 @@ public class Location : BaseEntity
     [Required]
     public int CategoryId { get; set; }
     
+    public long? CreatedByTelegramId { get; set; }
+    
     // Navigation properties
     public virtual LocationCategory Category { get; set; } = null!;
     public virtual ICollection<LocationSubcategoryJoin> SubcategoryJoins { get; set; } = new List<LocationSubcategoryJoin>();
