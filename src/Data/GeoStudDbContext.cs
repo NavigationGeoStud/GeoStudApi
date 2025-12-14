@@ -33,12 +33,8 @@ public class GeoStudDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // Determine the default SQL function based on database provider
-        // CURRENT_TIMESTAMP works for both PostgreSQL and SQLite, but SQLite prefers datetime('now')
-        // We'll use a simple check: if ProviderName contains "Sqlite", use datetime('now'), otherwise CURRENT_TIMESTAMP
-        var providerName = Database.ProviderName ?? "";
-        var isSqlite = providerName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
-        var defaultDateSql = isSqlite ? "datetime('now')" : "CURRENT_TIMESTAMP";
+        // Use PostgreSQL CURRENT_TIMESTAMP for default date values
+        var defaultDateSql = "CURRENT_TIMESTAMP";
 
         // ServiceClient configuration
         modelBuilder.Entity<ServiceClient>(entity =>
@@ -52,7 +48,6 @@ public class GeoStudDbContext : DbContext
         {
             entity.HasIndex(e => e.Username).IsUnique();
             // Email can be nullable for Telegram users, but if provided must be unique
-            // SQLite allows null values in unique indexes, multiple nulls are allowed
             entity.HasIndex(e => e.Email).IsUnique();
             // TelegramId must be unique if provided
             entity.HasIndex(e => e.TelegramId).IsUnique();

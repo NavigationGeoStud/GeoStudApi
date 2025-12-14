@@ -69,28 +69,7 @@ if (!string.IsNullOrEmpty(actualConnectionString))
     isPostgresConnection = isPostgresFromAspire || isPostgresPattern || hasPostgresPort || hasNpgsqlPattern;
 }
 
-// SQLite should be used only if:
-// 1. Explicitly requested via arguments or environment variable
-// 2. OR environment is Local/Development AND no valid PostgreSQL connection is available
-var forceSqlite = args.Contains("--sqlite") || 
-                  args.Contains("--local") ||
-                  Environment.GetEnvironmentVariable("FORCE_SQLITE") == "true";
-
-// Force PostgreSQL if connection string is set via Aspire (WithReference) or environment variable
-var forcePostgres = isPostgresFromAspire || 
-                   Environment.GetEnvironmentVariable("FORCE_POSTGRESQL") == "true";
-
-// If SQLite is explicitly forced, use it (unless PostgreSQL is also explicitly forced)
-// Otherwise, use SQLite only if in Local/Development environment and no PostgreSQL connection available
-var useSqlite = forceSqlite 
-    ? !forcePostgres  // If SQLite is forced, use it unless PostgreSQL is also forced
-    : ((builder.Environment.EnvironmentName == "Local" || builder.Environment.EnvironmentName == "Development") && !isPostgresConnection);
-
-// Override environment if SQLite arguments are provided
-if (forceSqlite)
-{
-    builder.Environment.EnvironmentName = "Local";
-}
+// Always use PostgreSQL - SQLite support has been removed
 
 Console.WriteLine("🔍 DEBUG: Checking all connection string environment variables:");
 Console.WriteLine($"   ConnectionStrings__DefaultConnection (env): {(string.IsNullOrEmpty(postgresConnectionEnv) ? "NOT SET" : "SET")}");
@@ -124,7 +103,7 @@ if (!string.IsNullOrEmpty(postgresConnectionFromConfig))
     Console.WriteLine($"   Value: {masked}");
 }
 
-Console.WriteLine($"🔧 Database Provider: {(useSqlite ? "SQLite" : "PostgreSQL")}");
+Console.WriteLine($"🔧 Database Provider: PostgreSQL");
 Console.WriteLine($"🌍 Environment: {builder.Environment.EnvironmentName}");
 Console.WriteLine($"📊 Has PostgreSQL connection: {hasPostgresConnection}, Is valid PostgreSQL: {isPostgresConnection}");
 if (hasPostgresConnection)
@@ -141,17 +120,13 @@ else
     Console.WriteLine("❌ NO PostgreSQL connection string found from any source!");
 }
 
-if (isPostgresConnection && !useSqlite)
+if (isPostgresConnection)
 {
     Console.WriteLine("✅ Valid PostgreSQL connection string found - using PostgreSQL");
 }
-else if (!isPostgresConnection && !useSqlite)
+else
 {
-    Console.WriteLine("⚠️ No valid PostgreSQL connection string found, but SQLite not forced - will try to use PostgreSQL anyway");
-}
-else if (useSqlite)
-{
-    Console.WriteLine("⚠️ SQLite will be used (forced or no valid PostgreSQL connection)");
+    Console.WriteLine("⚠️ No valid PostgreSQL connection string found - will try to use PostgreSQL anyway");
 }
 
 // Add services to the container
@@ -163,61 +138,50 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
     });
 
-// Database - Configure based on mode
-if (useSqlite)
+// Database - Always use PostgreSQL
+// Try to get connection string in priority order: WithReference > Environment > Configuration
+var PosgressServerConnection = postgresConnectionFromRef;
+if (string.IsNullOrEmpty(PosgressServerConnection))
 {
-    var sqliteConnection = builder.Configuration.GetConnectionString("SqliteConnection") ?? "Data Source=GeoStudLocal.db";
-    builder.Services.AddDbContext<GeoStudDbContext>(options =>
-        options.UseSqlite(sqliteConnection));
-    Console.WriteLine("📊 Using SQLite database");
-    Console.WriteLine($"🔗 Connection: {sqliteConnection}");
+    // Try environment variable (Aspire uses ConnectionStrings__DefaultConnection)
+    PosgressServerConnection = postgresConnectionEnv;
 }
-else
+if (string.IsNullOrEmpty(PosgressServerConnection))
 {
-    // Try to get connection string in priority order: WithReference > Environment > Configuration
-    var PosgressServerConnection = postgresConnectionFromRef;
-    if (string.IsNullOrEmpty(PosgressServerConnection))
-    {
-        // Try environment variable (Aspire uses ConnectionStrings__DefaultConnection)
-        PosgressServerConnection = postgresConnectionEnv;
-    }
-    if (string.IsNullOrEmpty(PosgressServerConnection))
-    {
-        // Try configuration (which includes environment variables in ASP.NET Core)
-        PosgressServerConnection = postgresConnectionFromConfig;
-    }
-    if (string.IsNullOrEmpty(PosgressServerConnection))
-    {
-        // Finally try configuration from appsettings.json
-        PosgressServerConnection = builder.Configuration.GetConnectionString("DefaultConnection");
-    }
-    
-    if (string.IsNullOrEmpty(PosgressServerConnection))
-    {
-        Console.WriteLine("❌ PostgreSQL connection string is empty!");
-        Console.WriteLine("🔧 Available connection strings from configuration:");
-        var connectionStrings = builder.Configuration.GetSection("ConnectionStrings").GetChildren();
-        foreach (var connStr in connectionStrings)
-        {
-            var masked = connStr.Value?.Contains("Password=") == true
-                ? connStr.Value.Substring(0, Math.Min(connStr.Value.IndexOf("Password=") + 20, connStr.Value.Length)) + "***"
-                : connStr.Value;
-            Console.WriteLine($"  - {connStr.Key}: {masked}");
-        }
-        Console.WriteLine("🔧 Environment variable ConnectionStrings__DefaultConnection:");
-        var envConnStr = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
-        Console.WriteLine($"  - {(string.IsNullOrEmpty(envConnStr) ? "NOT SET" : "SET")}");
-        throw new InvalidOperationException("PostgreSQL connection string is not configured");
-    }
-    
-    builder.Services.AddDbContext<GeoStudDbContext>(options =>
-        options.UseNpgsql(PosgressServerConnection));
-    Console.WriteLine("📊 Using PostgreSQL Server database");
-    var maskedConn = PosgressServerConnection.Contains("Password=") 
-        ? PosgressServerConnection.Substring(0, Math.Min(PosgressServerConnection.IndexOf("Password=") + 20, PosgressServerConnection.Length)) + "***" 
-        : PosgressServerConnection;
-    Console.WriteLine($"🔗 Connection: {maskedConn}");
+    // Try configuration (which includes environment variables in ASP.NET Core)
+    PosgressServerConnection = postgresConnectionFromConfig;
 }
+if (string.IsNullOrEmpty(PosgressServerConnection))
+{
+    // Finally try configuration from appsettings.json
+    PosgressServerConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+}
+
+if (string.IsNullOrEmpty(PosgressServerConnection))
+{
+    Console.WriteLine("❌ PostgreSQL connection string is empty!");
+    Console.WriteLine("🔧 Available connection strings from configuration:");
+    var connectionStrings = builder.Configuration.GetSection("ConnectionStrings").GetChildren();
+    foreach (var connStr in connectionStrings)
+    {
+        var masked = connStr.Value?.Contains("Password=") == true
+            ? connStr.Value.Substring(0, Math.Min(connStr.Value.IndexOf("Password=") + 20, connStr.Value.Length)) + "***"
+            : connStr.Value;
+        Console.WriteLine($"  - {connStr.Key}: {masked}");
+    }
+    Console.WriteLine("🔧 Environment variable ConnectionStrings__DefaultConnection:");
+    var envConnStr = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
+    Console.WriteLine($"  - {(string.IsNullOrEmpty(envConnStr) ? "NOT SET" : "SET")}");
+    throw new InvalidOperationException("PostgreSQL connection string is not configured");
+}
+
+builder.Services.AddDbContext<GeoStudDbContext>(options =>
+    options.UseNpgsql(PosgressServerConnection));
+Console.WriteLine("📊 Using PostgreSQL Server database");
+var maskedConn = PosgressServerConnection.Contains("Password=") 
+    ? PosgressServerConnection.Substring(0, Math.Min(PosgressServerConnection.IndexOf("Password=") + 20, PosgressServerConnection.Length)) + "***" 
+    : PosgressServerConnection;
+Console.WriteLine($"🔗 Connection: {maskedConn}");
 
 // Authentication & Authorization
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -280,10 +244,8 @@ builder.Services.AddScoped<INeuroApiService, NeuroApiService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    var title = useSqlite ? "GeoStud API (Local Development)" : "GeoStud API";
-    var description = useSqlite 
-        ? "API for GeoStud application with student survey data collection - Local Development Mode"
-        : "API for GeoStud application with student survey data collection";
+    var title = "GeoStud API";
+    var description = "API for GeoStud application with student survey data collection";
 
     c.SwaggerDoc("v1", new OpenApiInfo
     {
@@ -331,36 +293,18 @@ builder.Services.AddSwaggerGen(c =>
     }
 });
 
-// CORS - Configure based on mode
-if (useSqlite)
+// CORS Configuration
+builder.Services.AddCors(options =>
 {
-    // More permissive CORS for local development
-    builder.Services.AddCors(options =>
+    options.AddPolicy("AllowSpecificOrigins", policy =>
     {
-        options.AddPolicy("LocalDevelopment", policy =>
-        {
-            policy.AllowAnyOrigin()
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
-        });
+        policy.WithOrigins(builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() ?? new[] { "*" })
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
-    Console.WriteLine("🌐 CORS: Local development mode (permissive)");
-}
-else
-{
-    // Production CORS
-    builder.Services.AddCors(options =>
-    {
-        options.AddPolicy("AllowSpecificOrigins", policy =>
-        {
-            policy.WithOrigins(builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() ?? new[] { "*" })
-                  .AllowAnyHeader()
-                  .AllowAnyMethod()
-                  .AllowCredentials();
-        });
-    });
-    Console.WriteLine("🌐 CORS: Production mode (restricted)");
-}
+});
+Console.WriteLine("🌐 CORS: Configured");
 
 var app = builder.Build();
 
@@ -369,23 +313,15 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
-    var swaggerTitle = useSqlite ? "GeoStud API v1 (Local)" : "GeoStud API v1";
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", swaggerTitle);
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "GeoStud API v1");
     c.RoutePrefix = string.Empty; // Set Swagger UI at the app's root
-    c.DocumentTitle = useSqlite ? "GeoStud API - Local Development" : "GeoStud API";
+    c.DocumentTitle = "GeoStud API";
 });
 
 app.UseHttpsRedirection();
 
-// Use appropriate CORS policy
-if (useSqlite)
-{
-    app.UseCors("LocalDevelopment");
-}
-else
-{
-    app.UseCors("AllowSpecificOrigins");
-}
+// Use CORS policy
+app.UseCors("AllowSpecificOrigins");
 
 // Add custom middleware
 app.UseMiddleware<GeoStud.Api.Middleware.RequestLoggingMiddleware>();
@@ -478,15 +414,7 @@ using (var scope = app.Services.CreateScope())
     
     // Location seed data has been removed
     
-    if (useSqlite)
-    {
-        Console.WriteLine("✅ Local database initialized with SQLite");
-        Console.WriteLine("📊 Database file: GeoStudLocal.db");
-    }
-    else
-    {
-        Console.WriteLine("✅ Database initialized with PostgreSQL");
-    }
+    Console.WriteLine("✅ Database initialized with PostgreSQL");
 }
 
 app.Run();
