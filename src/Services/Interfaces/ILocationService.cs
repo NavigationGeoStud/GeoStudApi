@@ -11,8 +11,10 @@ public interface ILocationService
     Task<LocationResponse?> GetLocationByIdAsync(int id);
     Task<IEnumerable<LocationResponse>> GetLocationsByCategoryAsync(int categoryId);
     Task<LocationResponse> CreateLocationAsync(LocationRequest request);
-    Task<LocationResponse> CreateLocationFromTelegramAsync(CreateLocationTelegramRequest request);
+    Task<LocationResponse> CreateLocationFromTelegramAsync(CreateLocationTelegramRequest request, long? telegramId = null);
+    Task<bool> CanUserCreateLocationAsync(long telegramId);
     Task<LocationResponse> UpdateLocationAsync(int id, LocationRequest request);
+    Task<LocationResponse?> UpdateUserLocationAsync(int locationId, long telegramId, UpdateLocationModerationRequest request);
     Task<bool> DeleteLocationAsync(int id);
     Task<IEnumerable<CategoryResponse>> GetCategoriesAsync();
     Task<IEnumerable<LocationResponse>> GetNearbyLocationsAsync(string coordinates, double radiusKm = 5);
