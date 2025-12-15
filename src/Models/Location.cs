@@ -56,5 +56,6 @@ public class Location : BaseEntity
     public virtual LocationCategory Category { get; set; } = null!;
     public virtual ICollection<LocationSubcategoryJoin> SubcategoryJoins { get; set; } = new List<LocationSubcategoryJoin>();
     public virtual ICollection<FavoriteLocation> FavoriteLocations { get; set; } = new List<FavoriteLocation>();
+    public virtual ICollection<LocationDislike> LocationDislikes { get; set; } = new List<LocationDislike>();
 }
 

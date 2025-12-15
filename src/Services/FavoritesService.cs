@@ -10,11 +10,16 @@ public class FavoritesService : IFavoritesService
 {
     private readonly GeoStudDbContext _context;
     private readonly ILogger<FavoritesService> _logger;
+    private readonly IRecommendationService? _recommendationService;
 
-    public FavoritesService(GeoStudDbContext context, ILogger<FavoritesService> logger)
+    public FavoritesService(
+        GeoStudDbContext context, 
+        ILogger<FavoritesService> logger,
+        IRecommendationService? recommendationService = null)
     {
         _context = context;
         _logger = logger;
+        _recommendationService = recommendationService;
     }
 
     public async Task<int?> GetUserIdFromClientIdAsync(string clientId)
@@ -163,6 +168,20 @@ public class FavoritesService : IFavoritesService
         await _context.Entry(favorite)
             .Reference(f => f.Location)
             .LoadAsync();
+
+        // Записываем положительную обратную связь для обучения системы рекомендаций
+        if (_recommendationService != null && !isRestored)
+        {
+            try
+            {
+                await _recommendationService.RecordPositiveFeedbackAsync(userId, request.LocationId);
+            }
+            catch (Exception ex)
+            {
+                // Логируем ошибку, но не прерываем выполнение
+                _logger.LogWarning(ex, "Failed to record positive feedback for recommendation system");
+            }
+        }
 
         _logger.LogDebug("FavoriteLocation {FavoriteId} {Action} successfully for user {UserId}", 
             favorite.Id, isRestored ? "restored" : "created", userId);

@@ -33,6 +33,7 @@ public class TelegramController : ControllerBase
     private readonly IPeopleService _peopleService;
     private readonly INotificationService _notificationService;
     private readonly ILocationSuggestionService _locationSuggestionService;
+    private readonly IRecommendationService _recommendationService;
     private readonly IWebhookService _webhookService;
     private readonly ILogger<TelegramController> _logger;
 
@@ -45,6 +46,7 @@ public class TelegramController : ControllerBase
         IPeopleService peopleService,
         INotificationService notificationService,
         ILocationSuggestionService locationSuggestionService,
+        IRecommendationService recommendationService,
         IWebhookService webhookService,
         ILogger<TelegramController> logger)
     {
@@ -56,6 +58,7 @@ public class TelegramController : ControllerBase
         _peopleService = peopleService;
         _notificationService = notificationService;
         _locationSuggestionService = locationSuggestionService;
+        _recommendationService = recommendationService;
         _webhookService = webhookService;
         _logger = logger;
     }
@@ -323,6 +326,62 @@ public class TelegramController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error removing favorite");
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    /// <summary>
+    /// Dislike a location (skip / negative feedback)
+    /// </summary>
+    /// <param name="locationId">Location ID</param>
+    /// <param name="telegramId">Telegram user ID</param>
+    /// <returns>Success response</returns>
+    [HttpPost("locations/{locationId}/dislike")]
+    [ProducesResponseType(typeof(SuccessResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DislikeLocation(int locationId, [FromQuery] long telegramId)
+    {
+        try
+        {
+            if (telegramId == 0)
+            {
+                return BadRequest(new { error = "telegramId query parameter is required and must be a valid Telegram user ID" });
+            }
+
+            // Get user ID
+            var userId = await _favoritesService.GetUserIdFromTelegramIdAsync(telegramId);
+            if (userId == null)
+            {
+                return NotFound(new { error = "User not found" });
+            }
+
+            // Check if location exists
+            var location = await _locationService.GetLocationByIdAsync(locationId);
+            if (location == null)
+            {
+                return NotFound(new { error = "Location not found" });
+            }
+
+            // Record negative feedback for recommendation system
+            await _recommendationService.RecordNegativeFeedbackAsync(userId.Value, locationId);
+
+            return Ok(new SuccessResponse
+            {
+                Success = true,
+                Message = "Локация отмечена как неинтересная"
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "Invalid dislike location request");
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error disliking location");
             return StatusCode(500, "Internal server error");
         }
     }

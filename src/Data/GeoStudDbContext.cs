@@ -17,6 +17,7 @@ public class GeoStudDbContext : DbContext
     public DbSet<UserAnalyticsResponse> UserAnalyticsResponses { get; set; }
     public DbSet<AnalyticsData> AnalyticsData { get; set; }
     public DbSet<FavoriteLocation> FavoriteLocations { get; set; }
+    public DbSet<LocationDislike> LocationDislikes { get; set; }
     public DbSet<UserLike> UserLikes { get; set; }
     public DbSet<UserDislike> UserDislikes { get; set; }
     public DbSet<Match> Matches { get; set; }
@@ -152,6 +153,24 @@ public class GeoStudDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // LocationDislike configuration
+        modelBuilder.Entity<LocationDislike>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.UserId, e.LocationId }).IsUnique();
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.LocationId);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql(defaultDateSql);
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Location)
+                .WithMany(l => l.LocationDislikes)
+                .HasForeignKey(e => e.LocationId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // UserLike configuration
         modelBuilder.Entity<UserLike>(entity =>
         {
@@ -237,6 +256,7 @@ public class GeoStudDbContext : DbContext
         modelBuilder.Entity<UserAnalyticsResponse>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<AnalyticsData>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<FavoriteLocation>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<LocationDislike>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<UserLike>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<UserDislike>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<Match>().HasQueryFilter(e => !e.IsDeleted);

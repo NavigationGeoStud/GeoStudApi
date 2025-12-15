@@ -235,6 +235,7 @@ builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IPeopleService, PeopleService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<ILocationSuggestionService, LocationSuggestionService>();
+builder.Services.AddScoped<IRecommendationService, RecommendationService>();
 builder.Services.AddHttpClient<WebhookService>();
 builder.Services.AddScoped<IWebhookService, WebhookService>();
 builder.Services.AddHttpClient<NeuroApiService>();

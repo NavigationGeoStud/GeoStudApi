@@ -3,6 +3,7 @@ using System;
 using GeoStud.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GeoStud.Api.Migrations
 {
     [DbContext(typeof(GeoStudDbContext))]
-    partial class GeoStudDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251215171041_AddLocationDislikesTable")]
+    partial class AddLocationDislikesTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

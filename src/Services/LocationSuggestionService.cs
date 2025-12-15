@@ -14,17 +14,20 @@ public class LocationSuggestionService : ILocationSuggestionService
     private readonly GeoStudDbContext _context;
     private readonly IFavoritesService _favoritesService;
     private readonly INotificationService _notificationService;
+    private readonly IRecommendationService _recommendationService;
     private readonly ILogger<LocationSuggestionService> _logger;
 
     public LocationSuggestionService(
         GeoStudDbContext context,
         IFavoritesService favoritesService,
         INotificationService notificationService,
+        IRecommendationService recommendationService,
         ILogger<LocationSuggestionService> logger)
     {
         _context = context;
         _favoritesService = favoritesService;
         _notificationService = notificationService;
+        _recommendationService = recommendationService;
         _logger = logger;
     }
 
@@ -51,108 +54,8 @@ public class LocationSuggestionService : ILocationSuggestionService
             };
         }
 
-        // Get user's favorite location IDs
-        var favoriteLocationIds = await _context.FavoriteLocations
-            .Where(fl => fl.UserId == user.Id && !fl.IsDeleted)
-            .Select(fl => fl.LocationId)
-            .ToListAsync();
-
-        // Get rejected location IDs
-        var rejectedLocationIds = await _context.LocationSuggestions
-            .Where(ls => ls.TelegramId == telegramId && 
-                        ls.Status == "rejected" && 
-                        !ls.IsDeleted)
-            .Select(ls => ls.LocationId)
-            .ToListAsync();
-
-        // Get user interests
-        var interests = DeserializeInterests(user.Interests);
-
-        // Get user's favorite location categories
-        var favoriteCategories = await _context.FavoriteLocations
-            .Where(fl => fl.UserId == user.Id && !fl.IsDeleted)
-            .Select(fl => fl.Location.CategoryId)
-            .Distinct()
-            .ToListAsync();
-
-        // Build query for suggested locations
-        var query = _context.Locations
-            .Where(l => !l.IsDeleted && l.IsActive)
-            .Where(l => !favoriteLocationIds.Contains(l.Id))
-            .Where(l => !rejectedLocationIds.Contains(l.Id));
-
-        // Filter by interests if user has interests
-        if (interests.Any())
-        {
-            // This is a simplified matching - in production, you might want more sophisticated matching
-            query = query.Where(l => 
-                interests.Any(i => 
-                    l.Name.Contains(i, StringComparison.OrdinalIgnoreCase) ||
-                    (l.Description != null && l.Description.Contains(i, StringComparison.OrdinalIgnoreCase))));
-        }
-
-        // Prefer locations from favorite categories
-        var locations = await query
-            .OrderByDescending(l => favoriteCategories.Contains(l.CategoryId))
-            .ThenByDescending(l => l.Rating ?? 0)
-            .ThenByDescending(l => l.RatingCount ?? 0)
-            .ToListAsync();
-
-        var totalCount = locations.Count;
-        var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
-
-        var pagedLocations = locations
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToList();
-
-        // Convert to LocationResponse
-        var locationResponses = pagedLocations.Select(l => new LocationResponse
-        {
-            Id = l.Id,
-            Name = l.Name,
-            Description = l.Description,
-            Coordinates = l.Coordinates,
-            Address = l.Address,
-            City = l.City,
-            Phone = l.Phone,
-            Website = l.Website,
-            TelegramImageIds = l.TelegramImageIds,
-            Rating = l.Rating,
-            RatingCount = l.RatingCount,
-            PriceRange = l.PriceRange,
-            WorkingHours = l.WorkingHours,
-            IsActive = l.IsActive,
-            IsVerified = l.IsVerified,
-            CreatedAt = l.CreatedAt,
-            UpdatedAt = l.UpdatedAt,
-            Category = new LocationResponse.CategoryInfo
-            {
-                Id = l.CategoryId,
-                Name = l.Category.Name,
-                IconName = l.Category.IconName
-            },
-            Subcategories = l.SubcategoryJoins
-                .Where(sj => !sj.IsDeleted)
-                .Select(sj => new LocationResponse.SubcategoryInfo
-                {
-                    Id = sj.Subcategory.Id,
-                    Name = sj.Subcategory.Name,
-                    CategoryId = sj.Subcategory.CategoryId
-                })
-                .ToList()
-        }).ToList();
-
-        return new PagedResponse<LocationResponse>
-        {
-            Data = locationResponses,
-            Page = page,
-            PageSize = pageSize,
-            TotalCount = totalCount,
-            TotalPages = totalPages,
-            HasPreviousPage = page > 1,
-            HasNextPage = page < totalPages
-        };
+        // Используем новую систему рекомендаций с мутацией 20%
+        return await _recommendationService.GetRecommendationsAsync(user.Id, page, pageSize, mutationRate: 0.2);
     }
 
     public async Task<SuccessResponse> AcceptLocationSuggestionAsync(int locationId, long telegramId, int? notificationId = null)
@@ -188,6 +91,9 @@ public class LocationSuggestionService : ILocationSuggestionService
         {
             LocationId = locationId
         });
+
+        // Записываем положительную обратную связь для обучения системы
+        await _recommendationService.RecordPositiveFeedbackAsync(userId.Value, locationId);
 
         // Update or create location suggestion record
         var suggestion = await _context.LocationSuggestions
@@ -238,6 +144,14 @@ public class LocationSuggestionService : ILocationSuggestionService
         if (location == null)
         {
             throw new ArgumentException("Location not found", nameof(locationId));
+        }
+
+        // Получаем userId для записи обратной связи
+        var userId = await _favoritesService.GetUserIdFromTelegramIdAsync(telegramId);
+        if (userId.HasValue)
+        {
+            // Записываем отрицательную обратную связь для обучения системы
+            await _recommendationService.RecordNegativeFeedbackAsync(userId.Value, locationId);
         }
 
         // Update or create location suggestion record
